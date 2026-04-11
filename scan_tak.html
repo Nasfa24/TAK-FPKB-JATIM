@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Scan TAK - Koordinator FPKB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <script>
+    tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen pb-10 flex flex-col">
+
+  <div class="bg-gray-800 text-white pt-6 pb-6 px-4 shadow-md flex items-center gap-4 relative z-10 border-b-4 border-blue-500">
+    <button onclick="window.location.href='dashboard_koordinator.html'" class="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+    </button>
+    <h1 class="text-lg font-bold text-blue-400">Mode Scan TAK</h1>
+  </div>
+
+  <div class="flex-grow px-4 mt-6 flex flex-col items-center">
+    
+    <div id="boxPilihKegiatan" class="bg-white w-full max-w-md rounded-2xl shadow-lg p-6 border-t-4 border-blue-500 mb-4">
+      <h3 class="font-bold text-gray-800 mb-2">1. Pilih Kegiatan Saat Ini</h3>
+      <p class="text-xs text-gray-500 mb-4">Pilih jadwal kegiatan yang sedang berlangsung untuk mencatat kehadiran TAK.</p>
+      
+      <select id="pilihanKegiatan" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700 bg-gray-50 mb-4">
+        <option value="">Memuat data kegiatan...</option>
+      </select>
+      
+      <button onclick="mulaiScanner()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg shadow-md transition">
+        Aktifkan Kamera Scanner
+      </button>
+    </div>
+
+    <div id="boxKamera" class="hidden bg-white w-full max-w-md rounded-2xl shadow-lg p-4 border-t-4 border-blue-500 flex-col items-center">
+      <div class="w-full flex justify-between items-center mb-3 px-2">
+        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Arahkan ke QR TAK</span>
+        <button onclick="stopScanner()" class="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full font-bold">Tutup Kamera</button>
+      </div>
+      <div id="reader" class="w-full rounded-lg overflow-hidden border-2 border-dashed border-blue-500 bg-gray-50"></div>
+    </div>
+
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
+      authDomain: "apps-tak-fpkb.firebaseapp.com",
+      projectId: "apps-tak-fpkb",
+      storageBucket: "apps-tak-fpkb.firebasestorage.app",
+      messagingSenderId: "370368024191",
+      appId: "1:370368024191:web:ece099f60a9064a968394a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let currentUser = localStorage.getItem('tak_username');
+    let currentRole = localStorage.getItem('tak_role') || "";
+    if (!currentUser || !currentRole.toLowerCase().includes('koordinator')) { window.location.href = "index.html"; }
+
+    let html5QrcodeScanner = null;
+    let kegiatanTerpilih = null;
+
+    // AMBIL DATA KEGIATAN HARI INI/TERBARU DARI FIRESTORE
+    document.addEventListener("DOMContentLoaded", async function() {
+      let selectBox = document.getElementById('pilihanKegiatan');
+      try {
+        let snapshot = await db.collection("Jadwal_Kegiatan").orderBy("waktu_dibuat", "desc").limit(10).get();
+        selectBox.innerHTML = '<option value="">-- Pilih Kegiatan --</option>';
+        
+        snapshot.forEach(doc => {
+          let data = doc.data();
+          // Simpan seluruh objek data ke dalam option
+          let opt = document.createElement('option');
+          opt.value = JSON.stringify(data);
+          opt.text = `${data.tanggal} | ${data.jenis_kegiatan}`;
+          selectBox.appendChild(opt);
+        });
+      } catch(e) {
+        selectBox.innerHTML = '<option value="">Gagal memuat kegiatan</option>';
+      }
+    });
+
+    function mulaiScanner() {
+      let val = document.getElementById('pilihanKegiatan').value;
+      if (!val) { Swal.fire('Pilih dulu', 'Silakan pilih kegiatan terlebih dahulu!', 'warning'); return; }
+      
+      kegiatanTerpilih = JSON.parse(val);
+      document.getElementById('boxPilihKegiatan').classList.add('hidden');
+      document.getElementById('boxKamera').classList.remove('hidden');
+      document.getElementById('boxKamera').classList.add('flex');
+
+      html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0 }, false);
+      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    }
+
+    function stopScanner() {
+      if(html5QrcodeScanner) { html5QrcodeScanner.clear(); }
+      document.getElementById('boxKamera').classList.add('hidden');
+      document.getElementById('boxKamera').classList.remove('flex');
+      document.getElementById('boxPilihKegiatan').classList.remove('hidden');
+    }
+
+    async function onScanSuccess(decodedText, decodedResult) {
+      if(html5QrcodeScanner) html5QrcodeScanner.pause(true); // Pause biar tidak dobel scan
+      Swal.fire({ title: 'Memproses Absensi...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+
+      try {
+        let idKegiatan = kegiatanTerpilih.id_kegiatan;
+        let usernameTak = decodedText.trim();
+
+        // 1. Validasi User
+        let userDoc = await db.collection("Users").doc(usernameTak).get();
+        if (!userDoc.exists) throw new Error("QR Code tidak valid. Bukan anggota TAK.");
+        
+        let namaTak = userDoc.data().nama;
+
+        // 2. Kalkulasi Waktu & Poin (Mirip di sisi TAK, tapi dihitung oleh mesin Koordinator)
+        let jamStr = kegiatanTerpilih.jam_mulai;
+        if(jamStr.length <= 5) jamStr += ":00";
+        let waktuMulai = new Date(`${kegiatanTerpilih.tanggal}T${jamStr}`);
+        let now = new Date(); 
+
+        let waktuBuka = new Date(waktuMulai.getTime() - 15 * 60000); 
+        let waktuTutup = new Date(waktuMulai.getTime() + 3 * 60 * 60000); 
+
+        if (now < waktuBuka) throw new Error(`Absensi belum dibuka! Mulai jam: ${waktuBuka.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}`);
+        if (now > waktuTutup) throw new Error("Sesi absensi untuk kegiatan ini sudah ditutup (Expired).");
+
+        // 3. Cek Dobel Absen
+        let cekAbsen = await db.collection("Absensi").where("id_kegiatan", "==", idKegiatan).where("username", "==", usernameTak).get();
+        if (!cekAbsen.empty) throw new Error(`${namaTak} SUDAH absen untuk kegiatan ini.`);
+
+        // 4. Hitung Poin
+        let batasAman = new Date(waktuMulai.getTime() + 15 * 60000);
+        let poinDasar = (kegiatanTerpilih.jenis_kegiatan.toLowerCase().includes("upgrading")) ? 7 : 5;
+        let dendaPoin = 0;
+        let statusHadir = "Hadir (Tepat Waktu)";
+
+        if (now > batasAman) {
+          let selisih = Math.ceil((now - batasAman) / 60000);
+          let blokTelat = Math.ceil(selisih / 15);
+          dendaPoin = blokTelat * 2;
+          statusHadir = `Hadir (Telat ${selisih} menit)`;
+        }
+        let poinNet = poinDasar - dendaPoin;
+
+        // 5. Simpan ke Database
+        let batch = db.batch();
+        batch.set(db.collection("Absensi").doc(), {
+          id_absensi: "ABS-" + now.getTime(), id_kegiatan: idKegiatan, jenis_kegiatan: kegiatanTerpilih.jenis_kegiatan,
+          username: usernameTak, waktu_scan: firebase.firestore.FieldValue.serverTimestamp(), status: statusHadir, poin_didapat: poinNet
+        });
+
+        let poinLama = userDoc.data().poin ? parseInt(userDoc.data().poin) : 0;
+        batch.update(db.collection("Users").doc(usernameTak), { poin: poinLama + poinNet });
+
+        await batch.commit();
+
+        Swal.fire({ 
+          icon: 'success', title: 'Berhasil!', 
+          html: `<b>${namaTak}</b> berhasil diabsen.<br><span class="text-sm text-gray-500">${statusHadir} | +${poinNet} Poin</span>`,
+          timer: 2500, showConfirmButton: false
+        }).then(() => { html5QrcodeScanner.resume(); }); // Lanjut scan berikutnya!
+
+      } catch (error) {
+        Swal.fire({ icon: 'error', title: 'Ditolak', text: error.message, confirmButtonColor: '#d33' })
+        .then(() => { html5QrcodeScanner.resume(); });
+      }
+    }
+
+    function onScanFailure(error) { /* Diamkan */ }
+  </script>
+</body>
+</html>
