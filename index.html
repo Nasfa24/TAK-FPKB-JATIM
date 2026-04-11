@@ -39,7 +39,6 @@
   </div>
 
   <script>
-    // KUNCI BRANKAS FIREBASE ANDA
     const firebaseConfig = {
       apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
       authDomain: "apps-tak-fpkb.firebaseapp.com",
@@ -49,18 +48,26 @@
       appId: "1:370368024191:web:ece099f60a9064a968394a"
     };
 
-    // MENYALAKAN MESIN FIREBASE
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // CEK SESI (Karena sudah diluar Iframe, LocalStorage sekarang 100% Aman & Sah!)
+    // CEK SESI (Jika user sudah pernah login dan belum logout)
     document.addEventListener("DOMContentLoaded", function() {
       let savedUser = localStorage.getItem('tak_username');
       let savedRole = localStorage.getItem('tak_role');
+      
       if (savedUser) {
-        let dest = savedRole && savedRole.toLowerCase().includes('koordinator') ? 'dashboard_koordinator.html' : 'dashboard_tak.html';
-        window.location.href = dest; // Bebas pakai href, tombol Back pasti hidup!
+        let role = (savedRole || "").toLowerCase();
+        let dest = 'dashboard_tak.html'; // Default ke TAK
+        
+        if (role.includes('koordinator')) {
+          dest = 'dashboard_koordinator.html';
+        } else if (role.includes('bendahara')) {
+          dest = 'dashboard_bendahara.html';
+        }
+        
+        window.location.href = dest;
       }
     });
 
@@ -70,23 +77,19 @@
       const user = document.getElementById('username').value.trim();
       const pass = document.getElementById('password').value.trim();
       
-      // Trik Rahasia: Tambahkan @tak.fpkb.id di belakang layar
       const emailFirebase = user + "@tak.fpkb.id";
 
       btn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Memproses...`;
       btn.disabled = true;
 
-      // PROSES LOGIN KE FIREBASE AUTH
       auth.signInWithEmailAndPassword(emailFirebase, pass)
         .then((userCredential) => {
-          // JIKA SUKSES LOGIN, AMBIL DATA PROFIL DARI FIRESTORE
           return db.collection("Users").doc(user).get();
         })
         .then((doc) => {
           if (doc.exists) {
             let userData = doc.data();
             
-            // Simpan sesi di memori HP
             localStorage.setItem('tak_username', userData.username);
             localStorage.setItem('tak_role', userData.role);
             localStorage.setItem('tak_nama', userData.nama);
@@ -95,9 +98,16 @@
 
             btn.innerHTML = `Mengalihkan...`;
             
-            // Lompat ke Dashboard dengan kecepatan kilat
+            // LOGIKA PENGALIHAN BERDASARKAN ROLE
             let role = (userData.role || "").toString().toLowerCase();
-            let dest = role.includes('koordinator') ? 'dashboard_koordinator.html' : 'dashboard_tak.html';
+            let dest = 'dashboard_tak.html'; // Default ke TAK
+            
+            if (role.includes('koordinator')) {
+              dest = 'dashboard_koordinator.html';
+            } else if (role.includes('bendahara')) {
+              dest = 'dashboard_bendahara.html';
+            }
+            
             window.location.href = dest;
 
           } else {
@@ -106,7 +116,6 @@
         })
         .catch((error) => {
           btn.innerHTML = `Masuk`; btn.disabled = false;
-          // Pesan error custom agar lebih ramah
           let errorMsg = "Username atau Password salah!";
           if (error.code === 'auth/network-request-failed') errorMsg = "Koneksi internet terputus.";
           
