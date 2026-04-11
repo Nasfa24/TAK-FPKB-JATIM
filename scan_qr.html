@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Scan Absensi - TAK FPKB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <script>
+    tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen pb-10 flex flex-col">
+
+  <div class="bg-pkb text-white pt-6 pb-6 px-4 shadow-md flex items-center gap-4 relative z-10">
+    <button onclick="kembali()" class="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+    </button>
+    <h1 class="text-lg font-bold">Scan QR Koordinator</h1>
+  </div>
+
+  <div class="flex-grow px-4 mt-6 flex flex-col items-center">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-lg p-4">
+      <p class="text-center text-sm text-gray-500 mb-4">Arahkan kamera ke QR Code milik Koordinator atau Kegiatan untuk melakukan Absensi.</p>
+      
+      <div id="reader" class="w-full rounded-lg overflow-hidden border-2 border-pkb"></div>
+      
+    </div>
+  </div>
+
+  <script>
+    // KUNCI BRANKAS FIREBASE ANDA
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
+      authDomain: "apps-tak-fpkb.firebaseapp.com",
+      projectId: "apps-tak-fpkb",
+      storageBucket: "apps-tak-fpkb.firebasestorage.app",
+      messagingSenderId: "370368024191",
+      appId: "1:370368024191:web:ece099f60a9064a968394a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // CEK SESI USER
+    let currentUser = localStorage.getItem('tak_username');
+    if (!currentUser) { window.location.href = "index.html"; }
+
+    // INISIALISASI MESIN SCANNER
+    const html5QrcodeScanner = new Html5QrcodeScanner(
+      "reader", 
+      { fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0 }, 
+      /* verbose= */ false
+    );
+
+    // FUNGSI JIKA BERHASIL MENEMUKAN BACAAN QR
+    function onScanSuccess(decodedText, decodedResult) {
+      // 1. Matikan kamera segera setelah berhasil membaca agar tidak dobel scan
+      html5QrcodeScanner.clear();
+      
+      Swal.fire({ title: 'Memproses Absensi...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+
+      // 2. Mencatat hasil scan ke Database Firebase (Koleksi 'Absensi')
+      let dataAbsen = {
+        username_tak: currentUser,
+        id_kegiatan: decodedText, // Ini adalah teks dari QR yang di-scan
+        waktu_scan: firebase.firestore.FieldValue.serverTimestamp(),
+        status: "Hadir (Menunggu Validasi Poin)"
+      };
+
+      db.collection("Absensi").add(dataAbsen)
+        .then(() => {
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil!',
+            text: 'Absensi Anda telah terkirim.',
+            confirmButtonColor: '#059669'
+          }).then(() => {
+            kembali(); // Otomatis kembali ke dashboard setelah sukses
+          });
+        })
+        .catch((error) => {
+          Swal.fire({ icon: 'error', title: 'Gagal', text: error.message });
+        });
+    }
+
+    // FUNGSI JIKA KAMERA GAGAL BACA (Biarkan diam agar tidak spam error)
+    function onScanFailure(error) {
+      // console.warn(`Code scan error = ${error}`);
+    }
+
+    // NYALAKAN KAMERA SAAT HALAMAN DIMUAT
+    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+
+    // FUNGSI TOMBOL KEMBALI
+    function kembali() {
+      let role = localStorage.getItem('tak_role') || "";
+      let dest = role.toLowerCase().includes('koordinator') ? 'dashboard_koordinator.html' : 'dashboard_tak.html';
+      window.location.href = dest;
+    }
+  </script>
+</body>
+</html>

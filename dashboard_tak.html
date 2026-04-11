@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dashboard TAK - FPKB Jatim</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen pb-10 hidden" id="mainBody">
+
+  <div class="bg-pkb text-white pt-8 pb-16 px-6 rounded-b-3xl shadow-md relative overflow-hidden">
+    <div class="absolute top-0 right-0 opacity-10 pointer-events-none">
+      <svg class="w-40 h-40 transform translate-x-10 -translate-y-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+    </div>
+
+    <div class="flex justify-between items-center mb-4 relative z-10">
+      <h1 class="text-xl font-bold">Apps TAK FPKB</h1>
+      <button onclick="logout()" class="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-full transition shadow-sm">Keluar</button>
+    </div>
+    
+    <div class="relative z-10">
+      <p class="text-sm opacity-80">Selamat bekerja,</p>
+      <h2 id="namaTak" class="text-2xl font-bold mt-1 tracking-wide">Memuat...</h2>
+      <p id="namaDewan" class="text-xs font-medium mt-1 bg-black/20 inline-block px-3 py-1 rounded-full">...</p>
+    </div>
+  </div>
+
+  <div class="px-6 -mt-8 relative z-20">
+    <div class="bg-white rounded-2xl shadow-lg p-6 flex items-center justify-between border-b-4 border-pkb" id="poinCard">
+      <div>
+        <p class="text-gray-500 text-sm font-semibold mb-1">Saldo Poin Kedisiplinan</p>
+        <div class="flex items-end gap-2">
+          <span id="saldoPoin" class="text-4xl font-extrabold text-gray-800">...</span>
+          <span class="text-gray-400 font-medium pb-1">/ 100</span>
+        </div>
+      </div>
+      <div id="statusPoinIcon" class="bg-green-100 text-green-600 p-3 rounded-full">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="px-6 mt-6">
+    <div class="bg-white rounded-2xl shadow-md p-6 flex flex-col items-center justify-center border-t-2 border-gray-100">
+      <h3 class="text-gray-800 font-bold mb-1 text-center">Kartu Absensi Anda</h3>
+      <p class="text-xs text-gray-500 mb-4 text-center px-2">Tunjukkan layar ini kepada Koordinator saat kegiatan untuk di-scan.</p>
+      
+      <div class="bg-gray-50 p-3 rounded-2xl border-2 border-dashed border-gray-300 shadow-inner">
+        <img id="qrCodeImage" src="" alt="Menyiapkan QR Code..." class="w-48 h-48 object-cover rounded-lg">
+      </div>
+      
+      <p class="text-xs font-bold text-pkb mt-3 tracking-widest uppercase bg-green-50 px-4 py-1.5 rounded-md" id="qrUsername">...</p>
+    </div>
+  </div>
+
+  <div class="px-6 mt-8">
+    <h3 class="text-gray-800 font-bold mb-4 px-1">Menu Utama</h3>
+    <div class="grid grid-cols-2 gap-4">
+      <button onclick="bukaMenu('scan_qr.html')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition text-left flex flex-col items-center justify-center text-center group">
+        <div class="bg-blue-50 text-blue-500 p-4 rounded-full mb-3"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
+        <span class="text-sm font-semibold text-gray-700">Scan Absensi</span>
+      </button>
+      <button onclick="bukaMenu('kas_tak.html')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition text-left flex flex-col items-center justify-center text-center group">
+        <div class="bg-green-50 text-green-500 p-4 rounded-full mb-3"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+        <span class="text-sm font-semibold text-gray-700">Kas Bulanan</span>
+      </button>
+      <button onclick="bukaMenu('laporan_tak.html')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition text-left flex flex-col items-center justify-center text-center group">
+        <div class="bg-purple-50 text-purple-500 p-4 rounded-full mb-3"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>
+        <span class="text-sm font-semibold text-gray-700">Laporan Kinerja</span>
+      </button>
+      <button onclick="bukaMenu('izin_tak.html')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition text-left flex flex-col items-center justify-center text-center group">
+        <div class="bg-red-50 text-red-500 p-4 rounded-full mb-3"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>
+        <span class="text-sm font-semibold text-gray-700">Pengajuan Izin</span>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // KUNCI BRANKAS FIREBASE ANDA
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
+      authDomain: "apps-tak-fpkb.firebaseapp.com",
+      projectId: "apps-tak-fpkb",
+      storageBucket: "apps-tak-fpkb.firebasestorage.app",
+      messagingSenderId: "370368024191",
+      appId: "1:370368024191:web:ece099f60a9064a968394a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // CEK LOGIN
+    let currentUser = localStorage.getItem('tak_username');
+    if (!currentUser) {
+      window.location.href = "index.html"; // Usir ke login jika belum masuk
+    } else {
+      document.getElementById('mainBody').classList.remove('hidden');
+      
+      // MENGAMBIL DATA SECARA REALTIME DARI FIRESTORE (Keajaiban Firebase!)
+      db.collection("Users").doc(currentUser).onSnapshot((doc) => {
+        if (doc.exists) {
+          let data = doc.data();
+          document.getElementById('namaTak').innerText = data.nama;
+          document.getElementById('namaDewan').innerText = "TA: " + data.dewan;
+          document.getElementById('saldoPoin').innerText = data.poin;
+          
+          document.getElementById('qrCodeImage').src = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" + data.username;
+          document.getElementById('qrUsername').innerText = data.username;
+
+          if (data.poin < 100) {
+            document.getElementById('poinCard').classList.replace('border-pkb', 'border-red-500');
+            document.getElementById('saldoPoin').classList.add('text-red-600');
+            document.getElementById('statusPoinIcon').className = "bg-red-100 text-red-600 p-3 rounded-full";
+            document.getElementById('statusPoinIcon').innerHTML = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
+          }
+        }
+      });
+    }
+
+    function logout() {
+      Swal.fire({
+        title: 'Keluar Aplikasi?', icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#059669', cancelButtonColor: '#d33', confirmButtonText: 'Ya, Keluar!'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          localStorage.removeItem('tak_username');
+          localStorage.removeItem('tak_role');
+          auth.signOut().then(() => {
+            window.location.href = "index.html";
+          });
+        }
+      })
+    }
+
+    function bukaMenu(pageName) {
+      window.location.href = pageName;
+    }
+  </script>
+</body>
+</html>

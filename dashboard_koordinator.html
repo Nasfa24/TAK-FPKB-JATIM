@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dashboard Koordinator - TAK FPKB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+  <script>
+    tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen pb-10 hidden" id="mainBody">
+
+  <div class="bg-gray-800 text-white pt-8 pb-16 px-6 rounded-b-3xl shadow-lg relative overflow-hidden">
+    <div class="absolute top-0 right-0 opacity-10 pointer-events-none">
+      <svg class="w-40 h-40 transform translate-x-10 -translate-y-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"></path></svg>
+    </div>
+
+    <div class="flex justify-between items-center mb-4 relative z-10">
+      <h1 class="text-xl font-bold text-pkb-light">Ruang Kendali</h1>
+      <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-full transition shadow-md font-bold">Keluar</button>
+    </div>
+    
+    <div class="relative z-10">
+      <p class="text-sm text-gray-400">Selamat bertugas,</p>
+      <h2 id="namaKoordinator" class="text-2xl font-bold mt-1 tracking-wide text-white">Memuat...</h2>
+      <p class="text-xs font-bold mt-2 bg-pkb inline-block px-3 py-1 rounded-md uppercase tracking-wider shadow-sm">KOORDINATOR TAK</p>
+    </div>
+  </div>
+
+  <div class="px-6 -mt-8 relative z-20">
+    <div class="bg-white rounded-2xl shadow-xl p-6 border-t-4 border-pkb flex flex-col items-center">
+      <h3 class="text-gray-800 font-bold mb-1 w-full text-left">Buat QR Absensi Kegiatan</h3>
+      <p class="text-xs text-gray-500 mb-4 w-full text-left">Ketik ID atau Nama Kegiatan untuk memunculkan QR Code agar bisa di-scan oleh TAK.</p>
+      
+      <div class="flex w-full gap-2 mb-4">
+        <input type="text" id="idKegiatan" placeholder="Contoh: RAPAT-PARIPURNA-01" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none uppercase text-sm font-bold text-gray-700">
+        <button onclick="buatQR()" class="bg-pkb hover:bg-pkb-dark text-white px-4 py-2 rounded-lg font-bold transition shadow-sm">Buat</button>
+      </div>
+
+      <div id="areaQR" class="hidden flex-col items-center w-full">
+        <div class="bg-gray-50 p-4 rounded-2xl border-2 border-dashed border-gray-300 shadow-inner w-full flex justify-center">
+          <img id="qrKegiatanImg" src="" alt="QR Kegiatan" class="w-48 h-48 object-cover rounded-lg">
+        </div>
+        <p id="labelKegiatan" class="text-sm font-bold text-pkb mt-3 tracking-widest uppercase bg-green-50 px-4 py-1.5 rounded-md text-center"></p>
+        <p class="text-xs text-gray-500 mt-2 text-center">Tunjukkan layar ini kepada TAK untuk di-scan.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="px-6 mt-8">
+    <h3 class="text-gray-800 font-bold mb-4 px-1">Menu Operasional</h3>
+    <div class="grid grid-cols-2 gap-4">
+      
+      <button onclick="window.location.href='scan_tak.html'" class="bg-white p-5 rounded-2xl shadow-md border-b-4 border-blue-500 hover:shadow-lg transition text-left flex flex-col items-center justify-center text-center">
+        <div class="bg-blue-50 text-blue-500 p-4 rounded-full mb-3"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg></div>
+        <span class="text-sm font-bold text-gray-800">Scan QR TAK</span>
+      </button>
+
+      <button onclick="window.location.href='manajemen_tak.html'" class="bg-white p-5 rounded-2xl shadow-md border-b-4 border-yellow-500 hover:shadow-lg transition text-left flex flex-col items-center justify-center text-center">
+        <div class="bg-yellow-50 text-yellow-600 p-4 rounded-full mb-3"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg></div>
+        <span class="text-sm font-bold text-gray-800">Manajemen Akun</span>
+      </button>
+
+      <button onclick="Swal.fire('Fitur Segera Hadir', 'Menu Validasi Izin sedang dirakit', 'info')" class="bg-white p-5 rounded-2xl shadow-md border-b-4 border-red-500 hover:shadow-lg transition text-left flex flex-col items-center justify-center text-center">
+        <div class="bg-red-50 text-red-500 p-4 rounded-full mb-3"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg></div>
+        <span class="text-sm font-bold text-gray-800">Validasi Izin</span>
+      </button>
+
+      <button onclick="Swal.fire('Fitur Segera Hadir', 'Menu Pantau Laporan sedang dirakit', 'info')" class="bg-white p-5 rounded-2xl shadow-md border-b-4 border-purple-500 hover:shadow-lg transition text-left flex flex-col items-center justify-center text-center">
+        <div class="bg-purple-50 text-purple-500 p-4 rounded-full mb-3"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>
+        <span class="text-sm font-bold text-gray-800">Data Rekap</span>
+      </button>
+
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
+      authDomain: "apps-tak-fpkb.firebaseapp.com",
+      projectId: "apps-tak-fpkb",
+      storageBucket: "apps-tak-fpkb.firebasestorage.app",
+      messagingSenderId: "370368024191",
+      appId: "1:370368024191:web:ece099f60a9064a968394a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    // PROTEKSI HALAMAN KHUSUS KOORDINATOR
+    let currentUser = localStorage.getItem('tak_username');
+    let currentRole = localStorage.getItem('tak_role') || "";
+    let currentNama = localStorage.getItem('tak_nama') || "Koordinator";
+
+    if (!currentUser) {
+      window.location.href = "index.html"; // Usir ke login jika belum masuk
+    } else if (!currentRole.toLowerCase().includes('koordinator')) {
+      // Jika TAK biasa nyasar ke sini, tendang balik ke Dashboard TAK
+      Swal.fire({icon: 'error', title: 'Akses Ditolak', text: 'Halaman ini khusus Koordinator!'})
+      .then(() => { window.location.href = "dashboard_tak.html"; });
+    } else {
+      // Lulus sensor, tampilkan halaman
+      document.getElementById('mainBody').classList.remove('hidden');
+      document.getElementById('namaKoordinator').innerText = currentNama;
+    }
+
+    // FUNGSI MEMUNCULKAN QR CODE KEGIATAN
+    function buatQR() {
+      let idKeg = document.getElementById('idKegiatan').value.trim().toUpperCase();
+      if(idKeg === "") {
+        Swal.fire('Perhatian', 'Ketik ID atau Nama Kegiatan terlebih dahulu!', 'warning');
+        return;
+      }
+
+      // Mengubah spasi menjadi tanda strip agar format QR rapi
+      let idBersih = idKeg.replace(/\s+/g, '-');
+      document.getElementById('idKegiatan').value = idBersih;
+
+      // Render QR Menggunakan API (seperti di Dashboard TAK)
+      document.getElementById('qrKegiatanImg').src = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" + idBersih;
+      document.getElementById('labelKegiatan').innerText = idBersih;
+      
+      document.getElementById('areaQR').classList.remove('hidden');
+      document.getElementById('areaQR').classList.add('flex');
+    }
+
+    function logout() {
+      Swal.fire({
+        title: 'Keluar Ruang Kendali?', icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#059669', cancelButtonColor: '#d33', confirmButtonText: 'Ya, Keluar!'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          localStorage.clear();
+          auth.signOut().then(() => { window.location.href = "index.html"; });
+        }
+      })
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kas Bulanan - TAK FPKB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }
+  </script>
+</head>
+<body class="bg-gray-50 min-h-screen pb-10 flex flex-col">
+
+  <div class="bg-pkb text-white pt-6 pb-6 px-4 shadow-md flex items-center gap-4 relative z-10">
+    <button onclick="window.location.href='dashboard_tak.html'" class="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+    </button>
+    <h1 class="text-lg font-bold">Transparansi Kas</h1>
+  </div>
+
+  <div class="px-4 mt-6">
+    <div class="bg-white rounded-2xl shadow-lg p-6 border-t-4 border-pkb">
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Pilih Bulan & Tahun</label>
+        <div class="flex gap-2">
+          <input type="month" id="bulanCari" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none">
+          <button onclick="cariKas()" class="bg-pkb text-white px-4 py-2 rounded-lg font-bold hover:bg-pkb-dark">Cari</button>
+        </div>
+      </div>
+
+      <div id="hasilKas" class="hidden mt-6 pt-4 border-t border-gray-200">
+        <h4 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Rincian Tagihan</h4>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center"><span class="text-gray-600 text-sm">Tagihan Dasar</span><span id="txtDasar" class="font-bold text-gray-800">-</span></div>
+          <div class="flex justify-between items-center"><span class="text-gray-600 text-sm">Denda Keterlambatan</span><span id="txtDenda" class="font-bold text-red-500">-</span></div>
+          <div class="border-b border-dashed border-gray-300 my-2"></div>
+          <div class="flex justify-between items-center"><span class="text-gray-800 font-bold">Total Pembayaran</span><span id="txtTotal" class="font-black text-xl text-pkb">-</span></div>
+          
+          <div class="mt-4 p-3 rounded-lg text-center font-bold text-sm" id="badgeStatus">
+            STATUS
+          </div>
+        </div>
+      </div>
+      
+      <div id="pesanKosong" class="hidden mt-6 text-center text-gray-400 text-sm">
+        Tidak ada data tagihan untuk bulan tersebut.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
+      authDomain: "apps-tak-fpkb.firebaseapp.com",
+      projectId: "apps-tak-fpkb",
+      storageBucket: "apps-tak-fpkb.firebasestorage.app",
+      messagingSenderId: "370368024191",
+      appId: "1:370368024191:web:ece099f60a9064a968394a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let currentUser = localStorage.getItem('tak_username');
+    if (!currentUser) { window.location.href = "index.html"; }
+
+    function formatRupiah(angka) {
+      return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+    }
+
+    function cariKas() {
+      const blnValue = document.getElementById('bulanCari').value; // format: YYYY-MM
+      if (!blnValue) { Swal.fire('Perhatian', 'Pilih bulan terlebih dahulu', 'warning'); return; }
+
+      // Ubah YYYY-MM jadi format yang mudah dibaca, e.g., "04-2026" jika diperlukan
+      let parts = blnValue.split("-");
+      let blnFormat = parts[1] + "-" + parts[0]; 
+
+      Swal.fire({ title: 'Mencari data...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+
+      // Mencari di Koleksi Kas_Bulanan berdasarkan username dan bulan
+      db.collection("Kas_Bulanan")
+        .where("username", "==", currentUser)
+        .where("bulan", "==", blnFormat) // Asumsi nanti data kas disimpan dengan format "MM-YYYY"
+        .get()
+        .then((querySnapshot) => {
+          Swal.close();
+          document.getElementById('hasilKas').classList.add('hidden');
+          document.getElementById('pesanKosong').classList.add('hidden');
+
+          if (querySnapshot.empty) {
+            document.getElementById('pesanKosong').classList.remove('hidden');
+          } else {
+            // Ambil dokumen pertama yang cocok
+            let data = querySnapshot.docs[0].data();
+            
+            document.getElementById('txtDasar').innerText = formatRupiah(data.tagihan_dasar || 0);
+            document.getElementById('txtDenda').innerText = formatRupiah(data.denda || 0);
+            document.getElementById('txtTotal').innerText = formatRupiah(data.total || 0);
+            
+            let badge = document.getElementById('badgeStatus');
+            let status = (data.status || "").toLowerCase();
+            
+            if (status.includes("lunas")) {
+              badge.className = "mt-4 p-3 rounded-lg text-center font-bold text-sm bg-green-100 text-green-700";
+              badge.innerText = "LUNAS";
+            } else {
+              badge.className = "mt-4 p-3 rounded-lg text-center font-bold text-sm bg-red-100 text-red-700";
+              badge.innerText = "BELUM LUNAS";
+            }
+
+            document.getElementById('hasilKas').classList.remove('hidden');
+          }
+        })
+        .catch((error) => {
+          Swal.fire({ icon: 'error', title: 'Gagal', text: error.message });
+        });
+    }
+  </script>
+</body>
+</html>
