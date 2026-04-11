@@ -125,19 +125,16 @@
       document.getElementById('namaKoordinator').innerText = localStorage.getItem('tak_nama');
     }
 
-    // ========================================================
-    // FITUR BARU: AUTO-LOAD QR KEGIATAN TERAKHIR SAAT HALAMAN DIBUKA
-    // ========================================================
     document.addEventListener("DOMContentLoaded", async function() {
+      // 1. KUNCI KALENDER: Jangan biarkan pilih tanggal masa lalu
+      let todayFormat = new Date().toLocaleDateString('en-CA'); // Format: YYYY-MM-DD sesuai standar zona waktu lokal
+      document.getElementById("inputTanggal").setAttribute("min", todayFormat);
+
+      // 2. AUTO-LOAD QR TERAKHIR
       try {
-        let snapshot = await db.collection("Jadwal_Kegiatan")
-                               .orderBy("waktu_dibuat", "desc")
-                               .limit(1) // Ambil 1 yang paling baru
-                               .get();
-        
+        let snapshot = await db.collection("Jadwal_Kegiatan").orderBy("waktu_dibuat", "desc").limit(1).get();
         if (!snapshot.empty) {
           let jadwalTerbaru = snapshot.docs[0].data();
-          
           document.getElementById('qrKegiatanImg').src = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" + jadwalTerbaru.id_kegiatan;
           document.getElementById('labelKegiatan').innerText = jadwalTerbaru.jenis_kegiatan + " (" + jadwalTerbaru.id_kegiatan + ")";
           document.getElementById('judulQR').innerText = "Memuat Ulang QR Terakhir...";
@@ -170,6 +167,17 @@
       
       let tanggal = document.getElementById('inputTanggal').value;
       let jam = document.getElementById('inputJam').value;
+      
+      // GEMBOK LOGIKA WAKTU (Mencegah Bypass)
+      let tglDipilih = new Date(tanggal);
+      let hariIni = new Date();
+      hariIni.setHours(0,0,0,0); // Setel jam ke titik nol hari ini untuk perbandingan adil
+
+      if(tglDipilih < hariIni) {
+        Swal.fire('Aksi Ditolak', 'Mesin Waktu dimatikan. Anda tidak bisa membuat kegiatan di masa lalu!', 'error');
+        return;
+      }
+
       let toleransi = "15 Menit"; 
 
       let tglPecah = tanggal.split("-"); 
