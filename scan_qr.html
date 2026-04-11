@@ -9,7 +9,6 @@
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
   <script>
@@ -26,16 +25,14 @@
   </div>
 
   <div class="flex-grow px-4 mt-6 flex flex-col items-center">
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-lg p-4">
-      <p class="text-center text-sm text-gray-500 mb-4">Arahkan kamera ke QR Code milik Koordinator atau Kegiatan untuk melakukan Absensi.</p>
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-lg p-4 border-t-4 border-pkb">
+      <p class="text-center text-sm text-gray-500 mb-4">Arahkan kamera ke QR Code milik Koordinator. Pastikan Anda absen di waktu yang telah ditentukan.</p>
       
-      <div id="reader" class="w-full rounded-lg overflow-hidden border-2 border-pkb"></div>
-      
+      <div id="reader" class="w-full rounded-lg overflow-hidden border-2 border-dashed border-pkb bg-gray-50"></div>
     </div>
   </div>
 
   <script>
-    // KUNCI BRANKAS FIREBASE ANDA
     const firebaseConfig = {
       apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
       authDomain: "apps-tak-fpkb.firebaseapp.com",
@@ -48,57 +45,120 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // CEK SESI USER
     let currentUser = localStorage.getItem('tak_username');
     if (!currentUser) { window.location.href = "index.html"; }
 
-    // INISIALISASI MESIN SCANNER
-    const html5QrcodeScanner = new Html5QrcodeScanner(
-      "reader", 
-      { fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0 }, 
-      /* verbose= */ false
-    );
+    const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0 }, false);
 
-    // FUNGSI JIKA BERHASIL MENEMUKAN BACAAN QR
-    function onScanSuccess(decodedText, decodedResult) {
-      // 1. Matikan kamera segera setelah berhasil membaca agar tidak dobel scan
-      html5QrcodeScanner.clear();
-      
-      Swal.fire({ title: 'Memproses Absensi...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+    // KETIKA KAMERA BERHASIL MEMBACA QR
+    async function onScanSuccess(decodedText, decodedResult) {
+      html5QrcodeScanner.clear(); // Matikan kamera segera
+      Swal.fire({ title: 'Memeriksa Jadwal...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
 
-      // 2. Mencatat hasil scan ke Database Firebase (Koleksi 'Absensi')
-      let dataAbsen = {
-        username_tak: currentUser,
-        id_kegiatan: decodedText, // Ini adalah teks dari QR yang di-scan
-        waktu_scan: firebase.firestore.FieldValue.serverTimestamp(),
-        status: "Hadir (Menunggu Validasi Poin)"
-      };
+      try {
+        // 1. Cek Apakah Jadwal Valid di Firebase
+        let jadwalDoc = await db.collection("Jadwal_Kegiatan").doc(decodedText).get();
+        if (!jadwalDoc.exists) throw new Error("QR Code tidak dikenali atau acara tidak terdaftar di sistem.");
+        
+        let jadwal = jadwalDoc.data();
+        
+        // 2. Kalkulasi Waktu Kedisiplinan
+        // Format di database: tanggal "2026-04-20", jam "15:00"
+        let jamStr = jadwal.jam_mulai;
+        if(jamStr.length <= 5) jamStr += ":00"; // Memastikan format HH:mm:ss untuk parsing
 
-      db.collection("Absensi").add(dataAbsen)
-        .then(() => {
-          Swal.fire({
-            icon: 'success',
-            title: 'Berhasil!',
-            text: 'Absensi Anda telah terkirim.',
-            confirmButtonColor: '#059669'
-          }).then(() => {
-            kembali(); // Otomatis kembali ke dashboard setelah sukses
-          });
-        })
-        .catch((error) => {
-          Swal.fire({ icon: 'error', title: 'Gagal', text: error.message });
+        // Membuat Date Object berdasarkan waktu kegiatan
+        let waktuMulai = new Date(`${jadwal.tanggal}T${jamStr}`);
+        let now = new Date(); 
+
+        let waktuBuka = new Date(waktuMulai.getTime() - 15 * 60000); // 15 Menit Sebelum
+        let waktuTutup = new Date(waktuMulai.getTime() + 3 * 60 * 60000); // 3 Jam Sesudah
+
+        // 3. Eksekusi Aturan Waktu
+        if (now < waktuBuka) {
+          let jamBukaFormat = waktuBuka.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+          throw new Error(`Absensi belum dibuka! Silakan scan kembali pada pukul ${jamBukaFormat} WIB.`);
+        }
+        
+        if (now > waktuTutup) {
+          throw new Error("Sesi absensi telah ditutup. Masa berlaku QR untuk kegiatan ini sudah expired.");
+        }
+
+        // 4. Cek Apakah Sudah Pernah Absen
+        let cekAbsen = await db.collection("Absensi")
+                               .where("id_kegiatan", "==", decodedText)
+                               .where("username", "==", currentUser)
+                               .get();
+        if (!cekAbsen.empty) throw new Error("Anda sudah melakukan absensi untuk kegiatan ini.");
+
+        Swal.fire({ title: 'Menghitung Poin...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+
+        // 5. Kalkulasi Poin & Denda Keterlambatan
+        let toleransiMenit = 15; // Sesuai default di form Koordinator
+        let batasAman = new Date(waktuMulai.getTime() + toleransiMenit * 60000);
+        
+        let poinDasar = (jadwal.jenis_kegiatan.toLowerCase().includes("upgrading")) ? 7 : 5;
+        let dendaPoin = 0;
+        let statusHadir = "Hadir (Tepat Waktu)";
+
+        if (now > batasAman) {
+          let selisihMenit = Math.ceil((now - batasAman) / 60000);
+          let blokTelat = Math.ceil(selisihMenit / 15); // Setiap kelipatan 15 menit
+          dendaPoin = blokTelat * 2; // Denda 2 Poin per blok
+          statusHadir = `Hadir (Telat ${selisihMenit} menit)`;
+        }
+
+        let poinNet = poinDasar - dendaPoin;
+
+        // 6. Tulis Data ke Firestore (Absensi & Update Poin User)
+        let batch = db.batch();
+        
+        // Simpan Log Absensi
+        let refAbsen = db.collection("Absensi").doc();
+        batch.set(refAbsen, {
+          id_absensi: "ABS-" + now.getTime(),
+          id_kegiatan: decodedText,
+          jenis_kegiatan: jadwal.jenis_kegiatan,
+          username: currentUser,
+          waktu_scan: firebase.firestore.FieldValue.serverTimestamp(),
+          status: statusHadir,
+          poin_didapat: poinNet
         });
+
+        // Update Poin Utama User
+        let refUser = db.collection("Users").doc(currentUser);
+        let userDoc = await refUser.get();
+        let poinLama = userDoc.exists && userDoc.data().poin ? parseInt(userDoc.data().poin) : 0;
+        let poinBaru = poinLama + poinNet;
+        batch.update(refUser, { poin: poinBaru });
+
+        // Eksekusi semua penulisan database serentak
+        await batch.commit();
+
+        // 7. Tampilkan Pesan Sukses
+        let msg = `Absensi Berhasil! Poin Dasar +${poinDasar}.`;
+        if (dendaPoin > 0) { 
+          msg += ` Namun Anda terkena penalti keterlambatan -${dendaPoin} poin. Total ditambahkan: ${poinNet} Poin.`; 
+        }
+
+        // Simpan saldo poin terbaru di memory HP
+        localStorage.setItem('tak_poin', poinBaru);
+
+        Swal.fire({ icon: 'success', title: statusHadir, text: msg, confirmButtonColor: '#059669' })
+        .then(() => { kembali(); });
+
+      } catch (error) {
+        Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: error.message, confirmButtonColor: '#d33' })
+        .then(() => { html5QrcodeScanner.render(onScanSuccess, onScanFailure); }); // Nyalakan kamera lagi jika error
+      }
     }
 
-    // FUNGSI JIKA KAMERA GAGAL BACA (Biarkan diam agar tidak spam error)
     function onScanFailure(error) {
-      // console.warn(`Code scan error = ${error}`);
+      // Dibiarkan kosong agar tidak rewel di console saat mencari gambar
     }
 
-    // NYALAKAN KAMERA SAAT HALAMAN DIMUAT
     html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
-    // FUNGSI TOMBOL KEMBALI
     function kembali() {
       let role = localStorage.getItem('tak_role') || "";
       let dest = role.toLowerCase().includes('koordinator') ? 'dashboard_koordinator.html' : 'dashboard_tak.html';
