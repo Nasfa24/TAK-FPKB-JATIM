@@ -17,20 +17,32 @@
 </head>
 <body class="bg-gray-100 min-h-screen pb-10 flex flex-col">
 
-  <div class="bg-pkb text-white pt-6 pb-6 px-4 shadow-md flex items-center gap-4 relative z-10">
-    <button onclick="kembali()" class="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
+  <div class="bg-pkb text-white pt-6 pb-6 px-4 shadow-md flex items-center gap-4 relative z-10 border-b-4 border-pkb-dark">
+    <button onclick="kembali()" class="bg-white/20 p-2 rounded-full hover:bg-white/30 transition shadow-sm">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
     </button>
     <h1 class="text-lg font-bold">Scan QR Koordinator</h1>
   </div>
 
   <div class="flex-grow px-4 mt-6 flex flex-col items-center">
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-lg p-4 border-t-4 border-pkb">
-      <p class="text-center text-sm text-gray-500 mb-4">Arahkan kamera ke QR Code milik Koordinator. Pastikan Anda absen di waktu yang telah ditentukan.</p>
+    
+    <div id="boxScanner" class="bg-white w-full max-w-md rounded-2xl shadow-lg p-5 border-t-4 border-pkb flex-col items-center relative flex">
+      <p class="text-center text-sm font-semibold text-gray-600 mb-4 px-2">Arahkan kamera ke QR Code milik Koordinator. Pastikan Anda absen sesuai jadwal.</p>
       
-      <div id="reader" class="w-full rounded-lg overflow-hidden border-2 border-dashed border-pkb bg-gray-50"></div>
+      <div id="reader" class="w-full h-64 rounded-xl overflow-hidden border-[3px] border-pkb bg-black flex items-center justify-center shadow-inner relative">
+        <div class="absolute w-full h-1 bg-green-400 opacity-70 animate-[scan_2s_ease-in-out_infinite]"></div>
+      </div>
+      
+      <button onclick="kembali()" class="mt-5 w-full bg-red-50 text-red-600 font-bold py-2 rounded-lg border border-red-200 hover:bg-red-100 transition">
+        Batalkan Scan
+      </button>
     </div>
+
   </div>
+
+  <style>
+    @keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+  </style>
 
   <script>
     const firebaseConfig = {
@@ -48,33 +60,46 @@
     let currentUser = localStorage.getItem('tak_username');
     if (!currentUser) { window.location.href = "index.html"; }
 
-    const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0 }, false);
+    let html5QrCode; 
+
+    // OTOMATIS NYALAKAN KAMERA SAAT HALAMAN DIBUKA
+    document.addEventListener("DOMContentLoaded", function() {
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" }, // Paksa pakai kamera belakang HP
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        onScanSuccess
+      ).catch((err) => {
+        Swal.fire({
+          icon: 'error', title: 'Kamera Diblokir',
+          text: 'Gagal mengakses kamera. Pastikan browser Anda mengizinkan akses kamera dan aplikasi dibuka via HTTPS.',
+          confirmButtonColor: '#059669'
+        });
+      });
+    });
 
     // KETIKA KAMERA BERHASIL MEMBACA QR
-    async function onScanSuccess(decodedText, decodedResult) {
-      html5QrcodeScanner.clear(); // Matikan kamera segera
+    async function onScanSuccess(decodedText) {
+      if(html5QrCode) {
+        html5QrCode.stop().then(() => html5QrCode.clear()).catch(e => console.log(e)); // Matikan total
+      }
+      
       Swal.fire({ title: 'Memeriksa Jadwal...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
 
       try {
-        // 1. Cek Apakah Jadwal Valid di Firebase
         let jadwalDoc = await db.collection("Jadwal_Kegiatan").doc(decodedText).get();
         if (!jadwalDoc.exists) throw new Error("QR Code tidak dikenali atau acara tidak terdaftar di sistem.");
         
         let jadwal = jadwalDoc.data();
         
-        // 2. Kalkulasi Waktu Kedisiplinan
-        // Format di database: tanggal "2026-04-20", jam "15:00"
         let jamStr = jadwal.jam_mulai;
-        if(jamStr.length <= 5) jamStr += ":00"; // Memastikan format HH:mm:ss untuk parsing
-
-        // Membuat Date Object berdasarkan waktu kegiatan
+        if(jamStr.length <= 5) jamStr += ":00"; 
         let waktuMulai = new Date(`${jadwal.tanggal}T${jamStr}`);
         let now = new Date(); 
 
-        let waktuBuka = new Date(waktuMulai.getTime() - 15 * 60000); // 15 Menit Sebelum
-        let waktuTutup = new Date(waktuMulai.getTime() + 3 * 60 * 60000); // 3 Jam Sesudah
+        let waktuBuka = new Date(waktuMulai.getTime() - 15 * 60000); 
+        let waktuTutup = new Date(waktuMulai.getTime() + 3 * 60 * 60000); 
 
-        // 3. Eksekusi Aturan Waktu
         if (now < waktuBuka) {
           let jamBukaFormat = waktuBuka.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
           throw new Error(`Absensi belum dibuka! Silakan scan kembali pada pukul ${jamBukaFormat} WIB.`);
@@ -84,17 +109,12 @@
           throw new Error("Sesi absensi telah ditutup. Masa berlaku QR untuk kegiatan ini sudah expired.");
         }
 
-        // 4. Cek Apakah Sudah Pernah Absen
-        let cekAbsen = await db.collection("Absensi")
-                               .where("id_kegiatan", "==", decodedText)
-                               .where("username", "==", currentUser)
-                               .get();
+        let cekAbsen = await db.collection("Absensi").where("id_kegiatan", "==", decodedText).where("username", "==", currentUser).get();
         if (!cekAbsen.empty) throw new Error("Anda sudah melakukan absensi untuk kegiatan ini.");
 
         Swal.fire({ title: 'Menghitung Poin...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
 
-        // 5. Kalkulasi Poin & Denda Keterlambatan
-        let toleransiMenit = 15; // Sesuai default di form Koordinator
+        let toleransiMenit = 15; 
         let batasAman = new Date(waktuMulai.getTime() + toleransiMenit * 60000);
         
         let poinDasar = (jadwal.jenis_kegiatan.toLowerCase().includes("upgrading")) ? 7 : 5;
@@ -103,63 +123,44 @@
 
         if (now > batasAman) {
           let selisihMenit = Math.ceil((now - batasAman) / 60000);
-          let blokTelat = Math.ceil(selisihMenit / 15); // Setiap kelipatan 15 menit
-          dendaPoin = blokTelat * 2; // Denda 2 Poin per blok
+          let blokTelat = Math.ceil(selisihMenit / 15); 
+          dendaPoin = blokTelat * 2; 
           statusHadir = `Hadir (Telat ${selisihMenit} menit)`;
         }
 
         let poinNet = poinDasar - dendaPoin;
 
-        // 6. Tulis Data ke Firestore (Absensi & Update Poin User)
         let batch = db.batch();
-        
-        // Simpan Log Absensi
         let refAbsen = db.collection("Absensi").doc();
         batch.set(refAbsen, {
-          id_absensi: "ABS-" + now.getTime(),
-          id_kegiatan: decodedText,
-          jenis_kegiatan: jadwal.jenis_kegiatan,
-          username: currentUser,
-          waktu_scan: firebase.firestore.FieldValue.serverTimestamp(),
-          status: statusHadir,
-          poin_didapat: poinNet
+          id_absensi: "ABS-" + now.getTime(), id_kegiatan: decodedText, jenis_kegiatan: jadwal.jenis_kegiatan,
+          username: currentUser, waktu_scan: firebase.firestore.FieldValue.serverTimestamp(), status: statusHadir, poin_didapat: poinNet
         });
 
-        // Update Poin Utama User
         let refUser = db.collection("Users").doc(currentUser);
-        let userDoc = await refUser.get();
-        let poinLama = userDoc.exists && userDoc.data().poin ? parseInt(userDoc.data().poin) : 0;
+        let userDocInfo = await refUser.get();
+        let poinLama = userDocInfo.exists && userDocInfo.data().poin ? parseInt(userDocInfo.data().poin) : 0;
         let poinBaru = poinLama + poinNet;
         batch.update(refUser, { poin: poinBaru });
 
-        // Eksekusi semua penulisan database serentak
         await batch.commit();
 
-        // 7. Tampilkan Pesan Sukses
         let msg = `Absensi Berhasil! Poin Dasar +${poinDasar}.`;
-        if (dendaPoin > 0) { 
-          msg += ` Namun Anda terkena penalti keterlambatan -${dendaPoin} poin. Total ditambahkan: ${poinNet} Poin.`; 
-        }
+        if (dendaPoin > 0) { msg += ` Namun Anda terkena penalti keterlambatan -${dendaPoin} poin. Total ditambahkan: ${poinNet} Poin.`; }
 
-        // Simpan saldo poin terbaru di memory HP
         localStorage.setItem('tak_poin', poinBaru);
 
         Swal.fire({ icon: 'success', title: statusHadir, text: msg, confirmButtonColor: '#059669' })
         .then(() => { kembali(); });
 
       } catch (error) {
-        Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: error.message, confirmButtonColor: '#d33' })
-        .then(() => { html5QrcodeScanner.render(onScanSuccess, onScanFailure); }); // Nyalakan kamera lagi jika error
+        Swal.fire({ icon: 'error', title: 'Ditolak', text: error.message, confirmButtonColor: '#d33' })
+        .then(() => { kembali(); }); // Jika gagal, kembalikan ke dashboard agar user bisa coba lagi
       }
     }
 
-    function onScanFailure(error) {
-      // Dibiarkan kosong agar tidak rewel di console saat mencari gambar
-    }
-
-    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-
     function kembali() {
+      if(html5QrCode) { html5QrCode.stop().catch(e => console.log(e)); }
       let role = localStorage.getItem('tak_role') || "";
       let dest = role.toLowerCase().includes('koordinator') ? 'dashboard_koordinator.html' : 'dashboard_tak.html';
       window.location.href = dest;
