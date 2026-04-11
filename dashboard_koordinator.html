@@ -72,13 +72,32 @@
       </form>
 
       <div id="areaQR" class="hidden flex-col items-center w-full mt-6 pt-4 border-t border-dashed border-gray-300">
-        <h4 id="judulQR" class="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">QR Kegiatan Aktif</h4>
-        <div class="bg-gray-50 p-4 rounded-2xl border-2 border-pkb shadow-inner flex justify-center bg-white">
-          <img id="qrKegiatanImg" src="" alt="QR Kegiatan" class="w-48 h-48 object-cover">
+        <div class="flex justify-between w-full items-center mb-3">
+          <h4 id="judulQR" class="text-xs font-bold text-gray-400 uppercase tracking-wider">QR Kegiatan Aktif</h4>
+          <span id="badgeStatusKegiatan" class="text-[10px] font-bold px-2 py-1 rounded bg-green-100 text-green-600">AKTIF</span>
         </div>
-        <p id="labelKegiatan" class="text-sm font-bold text-pkb mt-3 tracking-widest uppercase text-center bg-green-50 px-3 py-1 rounded-md"></p>
+
+        <div id="qrBoxWrapper" class="bg-gray-50 p-4 rounded-2xl border-2 border-pkb shadow-inner flex justify-center bg-white relative">
+          <img id="qrKegiatanImg" src="" alt="QR Kegiatan" class="w-48 h-48 object-cover">
+          <div id="overlayTunda" class="hidden absolute inset-0 bg-yellow-500/80 rounded-2xl flex flex-col items-center justify-center backdrop-blur-sm">
+            <svg class="w-12 h-12 text-white mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <p class="text-white font-black tracking-widest text-lg">DITUNDA</p>
+          </div>
+        </div>
+        
+        <p id="labelKegiatan" class="text-sm font-bold text-pkb mt-3 tracking-widest uppercase text-center bg-green-50 px-3 py-1 rounded-md w-full"></p>
+        
+        <div class="grid grid-cols-2 gap-3 mt-4 w-full">
+          <button onclick="ubahStatusKegiatan('Ditunda')" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2.5 rounded-lg transition shadow-sm text-xs flex items-center justify-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 011.789 1.106l1.5 3M15 10h5.236a2 2 0 011.789 2.894l-3.5 7A2 2 0 0116.736 21H12"></path></svg> TUNDA
+          </button>
+          <button onclick="ubahStatusKegiatan('Ditutup')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2.5 rounded-lg transition shadow-sm text-xs flex items-center justify-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> TUTUP ACARA
+          </button>
+        </div>
+
         <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg mt-4 w-full">
-          <p class="text-xs text-blue-800 font-semibold text-center"><span class="font-bold">Info Kedisiplinan:</span> Absen dibuka 15 menit sebelum jam mulai, dan ditutup 3 jam setelahnya.</p>
+          <p class="text-xs text-blue-800 font-semibold text-center"><span class="font-bold">Info:</span> Gunakan tombol Tunda jika acara molor, atau Tutup jika acara telah selesai.</p>
         </div>
       </div>
 
@@ -87,7 +106,6 @@
 
   <div class="px-6 mt-8">
     <h3 class="text-gray-800 font-bold mb-4 px-1">Menu Operasional</h3>
-    
     <div class="grid grid-cols-2 gap-4">
       <button onclick="window.location.href='scan_tak.html'" class="bg-white p-4 rounded-2xl shadow-md border-b-4 border-blue-500 hover:shadow-lg transition flex flex-col items-center justify-center text-center">
         <div class="bg-blue-50 text-blue-500 p-3 rounded-full mb-2"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg></div>
@@ -135,6 +153,7 @@
 
     let currentUser = localStorage.getItem('tak_username');
     let currentRole = localStorage.getItem('tak_role') || "";
+    let activeKegiatanId = ""; // Menyimpan ID kegiatan yang sedang tampil
     
     if (!currentUser || !currentRole.toLowerCase().includes('koordinator')) {
       window.location.href = "index.html"; 
@@ -148,20 +167,43 @@
       document.getElementById("inputTanggal").setAttribute("min", todayFormat);
 
       try {
+        // Hanya ambil yang TERAKHIR dan BUKAN yang ditutup
         let snapshot = await db.collection("Jadwal_Kegiatan").orderBy("waktu_dibuat", "desc").limit(1).get();
         if (!snapshot.empty) {
           let jadwalTerbaru = snapshot.docs[0].data();
-          document.getElementById('qrKegiatanImg').src = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" + jadwalTerbaru.id_kegiatan;
-          document.getElementById('labelKegiatan').innerText = jadwalTerbaru.jenis_kegiatan + " (" + jadwalTerbaru.id_kegiatan + ")";
-          document.getElementById('judulQR').innerText = "Memuat Ulang QR Terakhir...";
           
-          document.getElementById('areaQR').classList.remove('hidden');
-          document.getElementById('areaQR').classList.add('flex');
+          if(jadwalTerbaru.status !== "Ditutup") {
+            tampilkanQR(jadwalTerbaru.id_kegiatan, jadwalTerbaru.jenis_kegiatan, jadwalTerbaru.status);
+          }
         }
       } catch (error) {
         console.log("Belum ada riwayat kegiatan.", error);
       }
     });
+
+    function tampilkanQR(id, jenis, status = "Aktif") {
+      activeKegiatanId = id;
+      document.getElementById('qrKegiatanImg').src = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" + id;
+      document.getElementById('labelKegiatan').innerText = jenis + " (" + id + ")";
+      
+      let badge = document.getElementById('badgeStatusKegiatan');
+      let overlay = document.getElementById('overlayTunda');
+
+      if(status === "Ditunda") {
+        badge.className = "text-[10px] font-bold px-2 py-1 rounded bg-yellow-100 text-yellow-600";
+        badge.innerText = "DITUNDA";
+        overlay.classList.remove('hidden');
+        document.getElementById('qrBoxWrapper').classList.replace('border-pkb', 'border-yellow-500');
+      } else {
+        badge.className = "text-[10px] font-bold px-2 py-1 rounded bg-green-100 text-green-600";
+        badge.innerText = "AKTIF";
+        overlay.classList.add('hidden');
+        document.getElementById('qrBoxWrapper').classList.replace('border-yellow-500', 'border-pkb');
+      }
+      
+      document.getElementById('areaQR').classList.remove('hidden');
+      document.getElementById('areaQR').classList.add('flex');
+    }
 
     function cekLainnya() {
       let val = document.getElementById('inputJenis').value;
@@ -194,7 +236,6 @@
       }
 
       let toleransi = "15 Menit"; 
-
       let tglPecah = tanggal.split("-"); 
       let kodeUnik = Math.floor(Math.random() * 900) + 100;
       let idKegiatan = `KEG-${tglPecah[2]}${tglPecah[1]}-${kodeUnik}`; 
@@ -211,6 +252,7 @@
           jam_mulai: jam,
           toleransi: toleransi,
           dibuat_oleh: currentUser,
+          status: "Aktif", // Status default
           waktu_dibuat: firebase.firestore.FieldValue.serverTimestamp()
         });
 
@@ -219,12 +261,9 @@
         fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
         .catch(err => console.log("GSheets Backup error: ", err)); 
 
-        document.getElementById('qrKegiatanImg').src = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" + idKegiatan;
-        document.getElementById('labelKegiatan').innerText = jenis + " (" + idKegiatan + ")";
-        document.getElementById('judulQR').innerText = "QR Kegiatan Baru Aktif";
-        
-        document.getElementById('areaQR').classList.remove('hidden');
-        document.getElementById('areaQR').classList.add('flex');
+        tampilkanQR(idKegiatan, jenis, "Aktif");
+        document.getElementById('formJadwal').reset();
+        document.getElementById('boxLainnya').classList.add('hidden');
         
         btn.innerHTML = `Buat & Munculkan QR`;
         btn.disabled = false;
@@ -239,6 +278,44 @@
         btn.innerHTML = `Buat & Munculkan QR`; btn.disabled = false;
         Swal.fire({ icon: 'error', title: 'Gagal', text: error.message });
       }
+    }
+
+    // ===============================================
+    // FUNGSI KENDALI BARCODE (TUNDA & TUTUP ACARA)
+    // ===============================================
+    function ubahStatusKegiatan(statusBaru) {
+      if(!activeKegiatanId) return;
+
+      let config = statusBaru === 'Ditunda' ? 
+        { title: 'Tunda Acara?', text: 'Barcode akan diburamkan sementara.', icon: 'warning', confirmButtonColor: '#eab308' } :
+        { title: 'Tutup Acara?', text: 'Barcode akan dihilangkan permanen dari layar utama.', icon: 'error', confirmButtonColor: '#ef4444' };
+
+      Swal.fire({
+        ...config,
+        showCancelButton: true,
+        confirmButtonText: `Ya, ${statusBaru}`,
+        cancelButtonText: 'Batal'
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          try {
+            await db.collection("Jadwal_Kegiatan").doc(activeKegiatanId).update({ status: statusBaru });
+            
+            if(statusBaru === "Ditutup") {
+              document.getElementById('areaQR').classList.add('hidden');
+              document.getElementById('areaQR').classList.remove('flex');
+              activeKegiatanId = "";
+              Swal.fire('Ditutup!', 'Kegiatan selesai. Barcode telah dihilangkan.', 'success');
+            } else {
+              // Jika ditunda, cukup panggil fungsi tampilkanQR lagi untuk update UI
+              let jenis = document.getElementById('labelKegiatan').innerText.split(" (")[0];
+              tampilkanQR(activeKegiatanId, jenis, "Ditunda");
+              Swal.fire('Ditunda', 'Kegiatan ditunda. Barcode diburamkan.', 'success');
+            }
+          } catch (err) {
+            Swal.fire('Gagal', err.message, 'error');
+          }
+        }
+      });
     }
 
     function logout() {
