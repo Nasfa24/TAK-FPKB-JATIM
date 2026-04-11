@@ -20,13 +20,13 @@
     <button onclick="window.location.href='dashboard_tak.html'" class="bg-white/20 p-2 rounded-full hover:bg-white/30 transition shadow-sm">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
     </button>
-    <h1 class="text-lg font-bold">Transparansi Kas Bulanan</h1>
+    <h1 class="text-lg font-bold">Transparansi Keuangan</h1>
   </div>
 
   <div class="px-4 mt-6">
     
     <div class="bg-white rounded-2xl shadow-md p-5 border-t-4 border-pkb mb-5">
-      <label class="block text-xs font-bold text-gray-500 mb-2 uppercase">Pilih Bulan Transparansi</label>
+      <label class="block text-xs font-bold text-gray-500 mb-2 uppercase">Cek Tagihan Kas Pribadi</label>
       <div class="flex gap-2">
         <input type="month" id="inputBulan" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none font-bold text-gray-700">
         <button onclick="muatDataKas()" class="bg-pkb hover:bg-pkb-dark text-white px-4 py-2 rounded-lg font-bold shadow-sm">Cek</button>
@@ -47,9 +47,30 @@
       </button>
     </div>
 
-    <h3 class="font-bold text-gray-700 text-sm mb-3 px-1">Daftar Tagihan & Status Pembayaran</h3>
-    <div id="listKas" class="space-y-3">
-      <div class="text-center text-gray-500 text-sm py-10 bg-white rounded-xl shadow border border-gray-200">Silakan pilih bulan lalu klik Cek.</div>
+    <div id="boxTagihan" class="hidden mb-8">
+      <h3 class="font-bold text-gray-700 text-sm mb-3 px-1">Status Pembayaran Tagihan</h3>
+      <div id="listKas" class="space-y-3"></div>
+    </div>
+
+
+    <div class="mt-8 border-t-2 border-dashed border-gray-300 pt-6">
+      <h3 class="font-bold text-gray-800 text-base mb-3 px-1 flex justify-between items-center">
+        Buku Kas Organisasi
+        <span class="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded font-bold animate-pulse">🔴 LIVE</span>
+      </h3>
+
+      <div class="bg-white rounded-2xl shadow-lg p-5 border-t-4 border-emerald-500">
+        <div class="text-center mb-5 pb-4 border-b border-gray-100">
+          <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Saldo Kas Saat Ini</p>
+          <h3 id="saldoUtama" class="text-3xl font-black text-emerald-600">Rp 0</h3>
+        </div>
+
+        <p class="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">10 Transaksi Terakhir</p>
+        
+        <div id="listRiwayatLive" class="space-y-3 max-h-64 overflow-y-auto pr-2">
+          <div class="text-center text-gray-400 text-xs py-5">Memuat buku kas...</div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -77,6 +98,10 @@
 
     const namaBulanIndo = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
 
+    function formatRp(angka) {
+      return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+    }
+
     document.addEventListener("DOMContentLoaded", async () => {
       let now = new Date();
       let month = (now.getMonth() + 1).toString().padStart(2, '0');
@@ -91,8 +116,70 @@
           document.getElementById('namaFileTxt').classList.add('text-pkb');
         }
       });
+
+      // AKTIFKAN MATA DEWA BUKU KAS
+      pantauBukuKasLive();
     });
 
+    // ==========================================
+    // MESIN LIVE UPDATE BUKU KAS UNTUK TAK
+    // ==========================================
+    function pantauBukuKasLive() {
+      db.collection("Kas_Transaksi").orderBy("waktu_input", "desc").onSnapshot((snapshot) => {
+        let totalM = 0;
+        let totalK = 0;
+        let htmlRiwayat = "";
+        let count = 0;
+
+        snapshot.forEach(doc => {
+          let data = doc.data();
+          
+          // Kalkulasi seluruh saldo
+          if (data.tipe === "Masuk") { totalM += parseInt(data.nominal); } 
+          else { totalK += parseInt(data.nominal); }
+
+          // Tampilkan hanya 10 transaksi terakhir agar HP tidak berat
+          if(count < 10) {
+            let tglStr = data.tanggal.split("-").reverse().join("-");
+            let isMasuk = data.tipe === "Masuk";
+            let warnaKiri = isMasuk ? "border-blue-500" : "border-red-500";
+            let warnaNominal = isMasuk ? "text-blue-600" : "text-red-600";
+            let icon = isMasuk ? "+" : "-";
+
+            let linkKwitansi = data.file_url ? `<a href="${data.file_url}" target="_blank" class="text-emerald-500 text-[9px] font-bold hover:underline flex items-center gap-1 mt-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg> Cek Nota</a>` : "";
+
+            htmlRiwayat += `
+              <div class="bg-gray-50 rounded-xl p-3 border-l-4 ${warnaKiri} flex justify-between items-start">
+                <div>
+                  <p class="text-[10px] text-gray-400 font-bold">${tglStr}</p>
+                  <p class="font-bold text-gray-700 text-xs mt-0.5">${data.keterangan}</p>
+                  ${linkKwitansi}
+                </div>
+                <div class="text-right ml-2">
+                  <p class="text-sm font-black ${warnaNominal}">${icon}${formatRp(data.nominal)}</p>
+                </div>
+              </div>
+            `;
+            count++;
+          }
+        });
+
+        // Tampilkan Saldo
+        document.getElementById('saldoUtama').innerText = formatRp(totalM - totalK);
+        
+        if (snapshot.empty) {
+          document.getElementById('listRiwayatLive').innerHTML = `<div class="text-center text-gray-400 text-xs py-5">Belum ada transaksi kas tercatat.</div>`;
+        } else {
+          document.getElementById('listRiwayatLive').innerHTML = htmlRiwayat;
+        }
+      }, (error) => {
+        console.log("Error mengambil data kas live:", error);
+      });
+    }
+
+    // ==========================================
+    // MESIN CEK TAGIHAN KAS PRIBADI (GSHEETS)
+    // ==========================================
     async function muatDataKas() {
       let rawBulan = document.getElementById('inputBulan').value; 
       if(!rawBulan) return;
@@ -103,6 +190,7 @@
 
       document.getElementById('labelBulanForm').innerText = namaBulanStr;
       document.getElementById('boxUpload').classList.remove('hidden');
+      document.getElementById('boxTagihan').classList.remove('hidden');
 
       let listContainer = document.getElementById('listKas');
       listContainer.innerHTML = `<div class="text-center text-gray-500 text-sm py-10 bg-white rounded-xl shadow border border-gray-200">Mengambil data dari server...</div>`;
@@ -126,8 +214,7 @@
         dataBulanIni.forEach(item => {
           let isLunas = item.status.toString().toLowerCase().includes("lunas");
           let badgeColor = isLunas ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700";
-          
-          let totalRp = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(item.total);
+          let totalRp = formatRp(item.total);
 
           let borderStyle = (item.username === currentUser) ? "border-l-4 border-pkb bg-green-50" : "border border-gray-200 bg-white";
           let labelAnda = (item.username === currentUser) ? `<span class="bg-pkb text-white text-[9px] px-2 py-0.5 rounded-full uppercase ml-2">Anda</span>` : "";
@@ -155,6 +242,9 @@
       }
     }
 
+    // ==========================================
+    // MESIN UPLOAD BUKTI TRANSFER
+    // ==========================================
     async function uploadBuktiKas() {
       let fileInput = document.getElementById('fileBukti');
       let rawBulan = document.getElementById('inputBulan').value;

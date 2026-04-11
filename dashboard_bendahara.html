@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dashboard Bendahara - TAK FPKB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+  <script>
+    tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen pb-10 hidden" id="mainBody">
+
+  <div class="bg-gray-800 text-white pt-8 pb-16 px-6 rounded-b-3xl shadow-lg relative overflow-hidden border-b-4 border-emerald-500">
+    <div class="absolute top-0 right-0 opacity-10 pointer-events-none">
+      <svg class="w-40 h-40 transform translate-x-10 -translate-y-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"></path></svg>
+    </div>
+
+    <div class="flex justify-between items-center mb-4 relative z-10">
+      <h1 class="text-xl font-bold text-emerald-400">Ruang Bendahara</h1>
+      <button onclick="keluarKeMenu()" class="bg-white/20 hover:bg-white/30 text-white text-xs px-4 py-2 rounded-full transition shadow-sm font-bold">Kembali</button>
+    </div>
+    
+    <div class="relative z-10">
+      <p class="text-sm text-gray-400">Pemegang Otoritas Kas,</p>
+      <h2 id="namaBendahara" class="text-2xl font-bold mt-1 tracking-wide text-white">Memuat...</h2>
+    </div>
+  </div>
+
+  <div class="px-4 -mt-10 relative z-20">
+    <div class="bg-white rounded-2xl shadow-xl p-5 border border-gray-100 flex flex-col items-center justify-center">
+      <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Saldo Kas Saat Ini</p>
+      <h3 id="saldoUtama" class="text-4xl font-black text-emerald-600 mb-4">Rp 0</h3>
+      
+      <div class="w-full grid grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+        <div class="text-center border-r border-gray-100">
+          <p class="text-[10px] font-bold text-gray-400 uppercase">Total Uang Masuk</p>
+          <p id="totalMasuk" class="text-sm font-bold text-blue-600">Rp 0</p>
+        </div>
+        <div class="text-center">
+          <p class="text-[10px] font-bold text-gray-400 uppercase">Total Uang Keluar</p>
+          <p id="totalKeluar" class="text-sm font-bold text-red-600">Rp 0</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="px-4 mt-6">
+    <div class="bg-white rounded-2xl shadow-md p-5 border-t-4 border-emerald-500 mb-6">
+      <h3 class="text-gray-800 font-bold mb-4 border-b pb-2 flex items-center gap-2">
+        <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        Catat Pembukuan Baru
+      </h3>
+      
+      <form id="formTransaksi" onsubmit="simpanTransaksi(event)" class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Jenis Transaksi</label>
+            <select id="inputTipe" required onchange="gantiWarnaInput()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-bold text-blue-600 bg-blue-50">
+              <option value="Masuk">Uang Masuk (Debit)</option>
+              <option value="Keluar">Uang Keluar (Kredit)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Tanggal</label>
+            <input type="date" id="inputTanggalT" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Nominal (Rp)</label>
+          <input type="number" id="inputNominal" required placeholder="Contoh: 150000" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-black text-gray-800">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Keterangan / Keperluan</label>
+          <input type="text" id="inputKeterangan" required placeholder="Contoh: Pembayaran cetak banner acara..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Upload Bukti (Nota/Kwitansi)</label>
+          <div class="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:bg-gray-50 transition cursor-pointer relative">
+            <input type="file" id="fileKwitansi" accept="image/*,application/pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+            <p class="text-xs text-gray-500 font-semibold" id="namaFileTxtT">Klik untuk melampirkan Foto/PDF (Wajib)</p>
+          </div>
+        </div>
+
+        <button type="submit" id="btnSimpanT" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-bold transition shadow-md mt-2">
+          Simpan Transaksi
+        </button>
+      </form>
+    </div>
+
+    <h3 class="font-bold text-gray-700 text-sm mb-3 px-1 flex justify-between items-center">
+      Buku Kas Umum (Riwayat)
+      <span class="text-[10px] bg-gray-200 text-gray-600 px-2 py-1 rounded">Live Update</span>
+    </h3>
+    <div id="listRiwayat" class="space-y-3">
+      <div class="text-center text-gray-500 text-sm py-10 bg-white rounded-xl shadow border border-gray-200">Memuat Buku Kas...</div>
+    </div>
+
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
+      authDomain: "apps-tak-fpkb.firebaseapp.com",
+      projectId: "apps-tak-fpkb",
+      storageBucket: "apps-tak-fpkb.firebasestorage.app",
+      messagingSenderId: "370368024191",
+      appId: "1:370368024191:web:ece099f60a9064a968394a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // MASUKKAN LINK APPS SCRIPT ANDA DI SINI
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxFMGDcYC1_C6z9nojL1IykVxFQsN7FJDVpi0twn2skuOsHPmC2lpuhkAa5ieLyYi-5/exec";
+
+    let currentUser = localStorage.getItem('tak_username');
+    let currentRole = localStorage.getItem('tak_role') || "";
+    
+    // Keamanan: Hanya Bendahara atau Koordinator yang boleh masuk
+    if (!currentUser || (!currentRole.toLowerCase().includes('bendahara') && !currentRole.toLowerCase().includes('koordinator'))) {
+      Swal.fire('Akses Ditolak', 'Anda tidak memiliki otoritas Bendahara.', 'error').then(() => {
+        window.location.href = "index.html"; 
+      });
+    } else {
+      document.getElementById('mainBody').classList.remove('hidden');
+      document.getElementById('namaBendahara').innerText = localStorage.getItem('tak_nama');
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // Set default tanggal hari ini
+      document.getElementById('inputTanggalT').value = new Date().toLocaleDateString('en-CA');
+
+      // Teks file input
+      document.getElementById('fileKwitansi').addEventListener('change', function(e) {
+        if(e.target.files.length > 0) {
+          document.getElementById('namaFileTxtT').innerText = e.target.files[0].name;
+          document.getElementById('namaFileTxtT').classList.add('text-emerald-600');
+        }
+      });
+
+      // Dengarkan perubahan database secara REALTIME (Mata Dewa)
+      pantauBukuKas();
+    });
+
+    function gantiWarnaInput() {
+      let tipe = document.getElementById('inputTipe').value;
+      let sel = document.getElementById('inputTipe');
+      if (tipe === "Masuk") {
+        sel.className = "w-full px-3 py-2 border border-gray-300 rounded-lg outline-none text-sm font-bold focus:ring-2 focus:ring-emerald-500 text-blue-600 bg-blue-50";
+      } else {
+        sel.className = "w-full px-3 py-2 border border-gray-300 rounded-lg outline-none text-sm font-bold focus:ring-2 focus:ring-emerald-500 text-red-600 bg-red-50";
+      }
+    }
+
+    function formatRp(angka) {
+      return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+    }
+
+    // LISTENER REALTIME FIREBASE
+    function pantauBukuKas() {
+      db.collection("Kas_Transaksi").orderBy("waktu_input", "desc").onSnapshot((snapshot) => {
+        let totalM = 0;
+        let totalK = 0;
+        let htmlRiwayat = "";
+
+        if (snapshot.empty) {
+          document.getElementById('listRiwayat').innerHTML = `<div class="bg-white p-6 rounded-xl shadow text-center border border-gray-200"><p class="text-gray-500 font-bold text-sm">Buku Kas masih kosong.</p></div>`;
+        }
+
+        snapshot.forEach(doc => {
+          let data = doc.data();
+          let tglStr = data.tanggal.split("-").reverse().join("-"); // YYYY-MM-DD to DD-MM-YYYY
+
+          if (data.tipe === "Masuk") {
+            totalM += parseInt(data.nominal);
+            warna = "border-blue-500"; bgNominal = "text-blue-600"; icon = "+";
+          } else {
+            totalK += parseInt(data.nominal);
+            warna = "border-red-500"; bgNominal = "text-red-600"; icon = "-";
+          }
+
+          let linkKwitansi = data.file_url ? `<a href="${data.file_url}" target="_blank" class="text-emerald-500 text-[10px] font-bold hover:underline flex items-center gap-1 mt-2"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg> Cek Nota</a>` : "";
+
+          htmlRiwayat += `
+            <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 ${warna}">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-xs text-gray-400 font-bold">${tglStr}</p>
+                  <p class="font-bold text-gray-800 text-sm leading-tight mt-1">${data.keterangan}</p>
+                  <p class="text-[10px] text-gray-400 mt-1">Oleh: ${data.diinput_oleh}</p>
+                  ${linkKwitansi}
+                </div>
+                <div class="text-right whitespace-nowrap ml-2">
+                  <p class="text-base font-black ${bgNominal}">${icon} ${formatRp(data.nominal)}</p>
+                  <p class="text-[9px] font-bold uppercase ${bgNominal} opacity-70">${data.tipe}</p>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+
+        // Kalkulasi Saldo
+        let saldoAkhir = totalM - totalK;
+
+        // Update Layar
+        document.getElementById('totalMasuk').innerText = formatRp(totalM);
+        document.getElementById('totalKeluar').innerText = formatRp(totalK);
+        document.getElementById('saldoUtama').innerText = formatRp(saldoAkhir);
+        
+        if (!snapshot.empty) {
+          document.getElementById('listRiwayat').innerHTML = htmlRiwayat;
+        }
+      }, (error) => {
+        console.log("Error mengambil data kas:", error);
+      });
+    }
+
+    async function simpanTransaksi(e) {
+      e.preventDefault();
+
+      let tipe = document.getElementById('inputTipe').value;
+      let tgl = document.getElementById('inputTanggalT').value;
+      let nominal = document.getElementById('inputNominal').value;
+      let keterangan = document.getElementById('inputKeterangan').value;
+      let fileInput = document.getElementById('fileKwitansi');
+
+      if (fileInput.files.length === 0) {
+        Swal.fire('Oops', 'Anda wajib melampirkan foto/PDF kwitansi transaksi.', 'warning');
+        return;
+      }
+
+      let file = fileInput.files[0];
+      if (file.size > 5 * 1024 * 1024) { Swal.fire('Besar Banget!', 'Maksimal ukuran file 5MB.', 'error'); return; }
+
+      let btn = document.getElementById('btnSimpanT');
+      btn.innerHTML = 'Memproses Transaksi...';
+      btn.disabled = true;
+      btn.classList.replace('bg-emerald-500', 'bg-gray-400');
+
+      let reader = new FileReader();
+      reader.onload = async function() {
+        let base64 = reader.result.split(',')[1];
+        
+        // Payload khusus untuk upload Bukti Transaksi ke GDrive
+        let payloadFile = {
+          action: "uploadBuktiTransaksi",
+          base64: base64,
+          mimeType: file.type,
+          fileName: file.name,
+          keterangan: keterangan,
+          tanggal: tgl,
+          tipe: tipe
+        };
+
+        try {
+          // 1. Upload file ke Apps Script (GDrive)
+          let response = await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payloadFile) });
+          let result = await response.json();
+
+          if (result.status !== "success") throw new Error("Gagal upload file ke GDrive.");
+
+          // 2. Simpan Data ke Firebase
+          let idTx = "TRX-" + new Date().getTime();
+          await db.collection("Kas_Transaksi").doc(idTx).set({
+            id_transaksi: idTx,
+            tipe: tipe,
+            tanggal: tgl,
+            nominal: parseInt(nominal),
+            keterangan: keterangan,
+            file_url: result.fileUrl,
+            diinput_oleh: localStorage.getItem('tak_nama') || currentUser,
+            waktu_input: firebase.firestore.FieldValue.serverTimestamp()
+          });
+
+          Swal.fire('Sukses!', 'Transaksi berhasil dibukukan.', 'success');
+          
+          // Reset Form
+          document.getElementById('formTransaksi').reset();
+          document.getElementById('namaFileTxtT').innerText = "Klik untuk melampirkan Foto/PDF (Wajib)";
+          document.getElementById('namaFileTxtT').classList.remove('text-emerald-600');
+          gantiWarnaInput();
+
+        } catch (err) {
+          Swal.fire('Gagal', err.toString(), 'error');
+        } finally {
+          btn.innerHTML = 'Simpan Transaksi';
+          btn.disabled = false;
+          btn.classList.replace('bg-gray-400', 'bg-emerald-500');
+        }
+      };
+      reader.onerror = function() {
+        Swal.fire('Error', 'Gagal membaca file', 'error');
+        btn.innerHTML = 'Simpan Transaksi'; btn.disabled = false; btn.classList.replace('bg-gray-400', 'bg-emerald-500');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function keluarKeMenu() {
+      // Jika dia Koordinator yang numpang masuk, kembalikan ke dashboard koordinator
+      if (currentRole.toLowerCase().includes('koordinator')) {
+        window.location.href = 'dashboard_koordinator.html';
+      } else {
+        window.location.href = 'index.html'; // Bendahara khusus kembali ke login
+      }
+    }
+  </script>
+</body>
+</html>
