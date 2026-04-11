@@ -23,7 +23,7 @@
     </div>
 
     <div class="flex justify-between items-center mb-4 relative z-10">
-      <h1 class="text-xl font-bold">Apps TAK FPKB</h1>
+      <h1 class="text-xl font-bold">LEBAH INDRAPURA</h1>
       <button onclick="logout()" class="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-full transition shadow-sm">Keluar</button>
     </div>
     
@@ -111,7 +111,7 @@
         if (doc.exists) {
           let data = doc.data();
           document.getElementById('namaTak').innerText = data.nama;
-          document.getElementById('namaDewan').innerText = "TA: " + data.dewan;
+          document.getElementById('namaDewan').innerText = "Tenaga Ahli Kedewanan: " + data.dewan;
           document.getElementById('saldoPoin').innerText = data.poin;
           
           document.getElementById('qrCodeImage').src = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" + data.username;
