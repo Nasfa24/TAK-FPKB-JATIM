@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Validasi Izin - Koordinator FPKB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>
+    tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen pb-10 flex flex-col">
+
+  <div class="bg-gray-800 text-white pt-6 pb-6 px-4 shadow-md flex items-center gap-4 relative z-10 border-b-4 border-red-500">
+    <button onclick="window.location.href='dashboard_koordinator.html'" class="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+    </button>
+    <h1 class="text-lg font-bold text-red-400">Validasi Izin TAK</h1>
+  </div>
+
+  <div class="px-4 mt-6">
+    <div class="flex justify-between items-center mb-4 px-1">
+      <h2 class="font-bold text-gray-700">Daftar Menunggu (Pending)</h2>
+      <span id="badgeCount" class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">0</span>
+    </div>
+
+    <div id="listIzin" class="space-y-4">
+      <div class="text-center text-gray-500 text-sm py-10">Memuat data pengajuan...</div>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
+      authDomain: "apps-tak-fpkb.firebaseapp.com",
+      projectId: "apps-tak-fpkb",
+      storageBucket: "apps-tak-fpkb.firebasestorage.app",
+      messagingSenderId: "370368024191",
+      appId: "1:370368024191:web:ece099f60a9064a968394a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let currentUser = localStorage.getItem('tak_username');
+    let currentRole = localStorage.getItem('tak_role') || "";
+    if (!currentUser || !currentRole.toLowerCase().includes('koordinator')) { window.location.href = "index.html"; }
+
+    document.addEventListener("DOMContentLoaded", loadIzinPending);
+
+    async function loadIzinPending() {
+      const listContainer = document.getElementById('listIzin');
+      try {
+        let snapshot = await db.collection("Izin")
+                               .where("status", "==", "Pending")
+                               .orderBy("waktu_pengajuan", "asc")
+                               .get();
+        
+        document.getElementById('badgeCount').innerText = snapshot.size;
+        listContainer.innerHTML = "";
+
+        if (snapshot.empty) {
+          listContainer.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow text-center border border-gray-200"><p class="text-gray-500 font-bold">Yeay! Tidak ada pengajuan izin yang tertunda.</p></div>`;
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          let data = doc.data();
+          let docId = doc.id;
+          // Format tanggal
+          let tgl = data.waktu_pengajuan ? data.waktu_pengajuan.toDate().toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'}) : "-";
+
+          listContainer.innerHTML += `
+            <div class="bg-white rounded-2xl shadow-md p-5 border-l-4 border-red-500 relative">
+              <p class="text-xs text-gray-400 font-bold mb-1">${tgl}</p>
+              <h3 class="font-bold text-gray-800 text-lg leading-tight">${data.nama}</h3>
+              <p class="text-xs text-pkb font-bold uppercase tracking-wide mb-2">${data.kegiatan}</p>
+              
+              <div class="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-3">
+                <p class="text-sm text-gray-600 italic">"${data.alasan}"</p>
+              </div>
+
+              <a href="${data.file_url}" target="_blank" class="text-blue-500 hover:text-blue-700 text-sm font-bold flex items-center gap-1 mb-4">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                Lihat Berkas Bukti (GDrive)
+              </a>
+
+              <div class="grid grid-cols-2 gap-3">
+                <button onclick="prosesIzin('${docId}', 'Diterima')" class="bg-pkb hover:bg-pkb-dark text-white text-sm font-bold py-2 rounded-lg transition shadow-sm">Terima Izin</button>
+                <button onclick="prosesIzin('${docId}', 'Ditolak')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-bold py-2 rounded-lg transition shadow-sm">Tolak</button>
+              </div>
+            </div>
+          `;
+        });
+      } catch (error) {
+        listContainer.innerHTML = `<div class="text-center text-red-500 font-bold">Gagal memuat data: ${error.message}</div>`;
+      }
+    }
+
+    async function prosesIzin(docId, statusBaru) {
+      Swal.fire({
+        title: `Yakin ingin ${statusBaru} izin ini?`,
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: statusBaru === 'Diterima' ? '#059669' : '#d33',
+        confirmButtonText: `Ya, ${statusBaru}`
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          Swal.fire({ title: 'Memproses...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+          try {
+            await db.collection("Izin").doc(docId).update({ status: statusBaru });
+            Swal.fire('Berhasil!', `Izin telah ${statusBaru}.`, 'success');
+            loadIzinPending(); // Refresh data otomatis
+          } catch (error) {
+            Swal.fire('Gagal', error.message, 'error');
+          }
+        }
+      })
+    }
+  </script>
+</body>
+</html>
