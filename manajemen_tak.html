@@ -24,41 +24,54 @@
   </div>
 
   <div class="px-4 mt-6">
-    <div class="bg-white rounded-2xl shadow-md p-5 border-t-4 border-yellow-500 mb-4">
-      <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Cari Username TAK</label>
-      <div class="flex gap-2">
-        <input type="text" id="inputCari" placeholder="Contoh: uuth" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none text-sm lowercase">
-        <button onclick="cariUser()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-bold transition shadow-sm">Cari</button>
-      </div>
+    <div class="bg-white rounded-2xl shadow-md p-5 border-t-4 border-yellow-500 mb-4 relative">
+      <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Cari Nama Anggota TAK</label>
+      <input type="text" id="inputCari" onkeyup="filterPencarian()" placeholder="Ketik nama (contoh: Nasfa)..." autocomplete="off" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none text-sm font-semibold text-gray-700">
+      
+      <div id="dropdownCari" class="hidden absolute left-0 right-0 mt-1 mx-5 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
+        </div>
     </div>
 
     <div id="hasilPencarian" class="hidden bg-white rounded-2xl shadow-md p-5 border-t-2 border-gray-200">
-      <h3 class="font-bold text-gray-800 mb-4 border-b pb-2">Informasi Profil</h3>
+      <h3 class="font-bold text-gray-800 mb-4 border-b pb-2">Informasi Profil Lengkap</h3>
       
       <div class="space-y-3">
         <div>
-          <label class="block text-xs text-gray-500">Nama Lengkap</label>
-          <input type="text" id="editNama" class="w-full font-bold px-3 py-2 border-b border-gray-300 focus:border-yellow-500 outline-none bg-gray-50">
+          <label class="block text-xs font-bold text-gray-400 uppercase">Username (Tidak Bisa Diedit)</label>
+          <input type="text" id="editUsername" disabled class="w-full font-bold px-3 py-2 border border-gray-200 bg-gray-100 rounded text-gray-500">
         </div>
         <div>
-          <label class="block text-xs text-gray-500">Pendamping Dewan (TA)</label>
-          <input type="text" id="editDewan" class="w-full font-bold px-3 py-2 border-b border-gray-300 focus:border-yellow-500 outline-none bg-gray-50">
+          <label class="block text-xs text-gray-500 font-bold uppercase">Nama Lengkap</label>
+          <input type="text" id="editNama" class="w-full font-bold px-3 py-2 border-b-2 border-gray-300 focus:border-yellow-500 outline-none bg-gray-50 text-gray-800">
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-500 font-bold uppercase">Pendamping Dewan (TA)</label>
+          <input type="text" id="editDewan" class="w-full font-bold px-3 py-2 border-b-2 border-gray-300 focus:border-yellow-500 outline-none bg-gray-50 text-gray-800">
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4 pt-2">
           <div>
-            <label class="block text-xs text-gray-500">No Kontrak</label>
-            <input type="text" id="editKontrak" class="w-full font-bold text-blue-600 px-3 py-2 border-b border-gray-300 focus:border-yellow-500 outline-none bg-gray-50">
+            <label class="block text-xs text-gray-500 font-bold uppercase">Role Akses</label>
+            <select id="editRole" class="w-full font-bold px-3 py-2 border-b-2 border-gray-300 focus:border-yellow-500 outline-none bg-gray-50 text-gray-800 text-sm">
+              <option value="TAK">TAK</option>
+              <option value="Koordinator">Koordinator</option>
+            </select>
           </div>
           <div>
-            <label class="block text-xs text-gray-500">Saldo Poin</label>
-            <input type="number" id="editPoin" class="w-full font-black text-2xl text-pkb px-3 py-2 border-b border-gray-300 focus:border-yellow-500 outline-none bg-yellow-50">
+            <label class="block text-xs text-gray-500 font-bold uppercase">No Kontrak</label>
+            <input type="text" id="editKontrak" class="w-full font-bold text-blue-600 px-3 py-2 border-b-2 border-gray-300 focus:border-yellow-500 outline-none bg-gray-50">
           </div>
+        </div>
+
+        <div class="pt-2">
+          <label class="block text-xs text-gray-500 font-bold uppercase">Saldo Poin Kedisiplinan</label>
+          <input type="number" id="editPoin" class="w-full font-black text-3xl text-pkb px-3 py-2 border-b-2 border-gray-300 focus:border-yellow-500 outline-none bg-yellow-50 text-center rounded-lg mt-1">
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-3 mt-6">
-        <button onclick="simpanProfil()" class="bg-pkb hover:bg-pkb-dark text-white font-bold py-2 rounded-lg shadow-sm">Simpan Data</button>
-        <button onclick="infoResetPassword()" class="bg-gray-800 hover:bg-black text-white font-bold py-2 rounded-lg shadow-sm text-sm">Reset Sandi</button>
+        <button onclick="simpanProfil()" class="bg-pkb hover:bg-pkb-dark text-white font-bold py-3 rounded-lg shadow-sm">Simpan Data</button>
+        <button onclick="infoResetPassword()" class="bg-gray-800 hover:bg-black text-white font-bold py-3 rounded-lg shadow-sm text-sm">Reset Sandi</button>
       </div>
     </div>
   </div>
@@ -76,52 +89,122 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
+    // GANTI DENGAN URL WEB APP BARU ANDA
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxFMGDcYC1_C6z9nojL1IykVxFQsN7FJDVpi0twn2skuOsHPmC2lpuhkAa5ieLyYi-5/exec";
+
     let currentUser = localStorage.getItem('tak_username');
     let currentRole = localStorage.getItem('tak_role') || "";
     if (!currentUser || !currentRole.toLowerCase().includes('koordinator')) { window.location.href = "index.html"; }
 
+    let semuaDataUsers = []; // Tempat menyimpan 150 data TAK di memori HP
     let userSedangDiedit = "";
 
-    async function cariUser() {
-      let username = document.getElementById('inputCari').value.trim().toLowerCase();
-      if(!username) return;
-
-      Swal.fire({ title: 'Mencari Data...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
-
+    // KETIKA HALAMAN DIBUKA, UNDUH SEMUA DATA TAK 1 KALI (Hemat Kuota)
+    document.addEventListener("DOMContentLoaded", async function() {
       try {
-        let doc = await db.collection("Users").doc(username).get();
-        if (!doc.exists) throw new Error("Username tidak ditemukan di database.");
-
-        let data = doc.data();
-        userSedangDiedit = username;
-
-        document.getElementById('editNama').value = data.nama || "";
-        document.getElementById('editDewan').value = data.dewan || "";
-        document.getElementById('editKontrak').value = data.no_kontrak || "";
-        document.getElementById('editPoin').value = data.poin || 0;
-
-        document.getElementById('hasilPencarian').classList.remove('hidden');
-        Swal.close();
+        let snapshot = await db.collection("Users").get();
+        snapshot.forEach(doc => {
+          semuaDataUsers.push(doc.data());
+        });
       } catch (error) {
-        document.getElementById('hasilPencarian').classList.add('hidden');
-        Swal.fire('Oops!', error.message, 'error');
+        console.log("Gagal memuat database TAK", error);
+      }
+    });
+
+    // MESIN PENCARI PINTAR (AUTO-COMPLETE)
+    function filterPencarian() {
+      let keyword = document.getElementById('inputCari').value.toLowerCase();
+      let dropdown = document.getElementById('dropdownCari');
+      
+      dropdown.innerHTML = ""; // Bersihkan hasil sebelumnya
+      
+      if (keyword.length < 2) {
+        dropdown.classList.add('hidden');
+        return; // Jangan cari kalau baru ketik 1 huruf
+      }
+
+      // Saring data berdasarkan kecocokan nama atau username
+      let hasilFilter = semuaDataUsers.filter(user => 
+        (user.nama && user.nama.toLowerCase().includes(keyword)) || 
+        (user.username && user.username.toLowerCase().includes(keyword))
+      );
+
+      if (hasilFilter.length > 0) {
+        dropdown.classList.remove('hidden');
+        // Tampilkan maksimal 5 nama agar tidak penuh layarnya
+        hasilFilter.slice(0, 5).forEach(user => {
+          let div = document.createElement('div');
+          div.className = "px-4 py-3 border-b hover:bg-yellow-50 cursor-pointer";
+          div.innerHTML = `<p class="font-bold text-sm text-gray-800">${user.nama}</p><p class="text-xs text-gray-500">ID: ${user.username} | Poin: ${user.poin}</p>`;
+          // Jika diklik, pilih user ini
+          div.onclick = function() { pilihUser(user); };
+          dropdown.appendChild(div);
+        });
+      } else {
+        dropdown.classList.remove('hidden');
+        dropdown.innerHTML = `<div class="px-4 py-3 text-sm text-gray-500 italic">Nama tidak ditemukan.</div>`;
       }
     }
 
+    // FUNGSI SAAT NAMA DIKLIK DARI DROPDOWN
+    function pilihUser(userObj) {
+      document.getElementById('inputCari').value = userObj.nama;
+      document.getElementById('dropdownCari').classList.add('hidden'); // Tutup dropdown
+      
+      userSedangDiedit = userObj.username;
+
+      // Isi semua form dengan data lengkap
+      document.getElementById('editUsername').value = userObj.username;
+      document.getElementById('editNama').value = userObj.nama || "";
+      document.getElementById('editDewan').value = userObj.dewan || "";
+      document.getElementById('editRole').value = userObj.role || "TAK";
+      document.getElementById('editKontrak').value = userObj.no_kontrak || "";
+      document.getElementById('editPoin').value = userObj.poin || 0;
+
+      document.getElementById('hasilPencarian').classList.remove('hidden');
+    }
+
+    // SINKRONISASI 2 ARAH (FIREBASE & GSHEETS)
     async function simpanProfil() {
       if(!userSedangDiedit) return;
       
-      Swal.fire({ title: 'Menyimpan...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+      Swal.fire({ title: 'Menyimpan & Sinkronisasi...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+
+      let dataBaru = {
+        nama: document.getElementById('editNama').value.trim(),
+        dewan: document.getElementById('editDewan').value.trim(),
+        role: document.getElementById('editRole').value,
+        no_kontrak: document.getElementById('editKontrak').value.trim(),
+        poin: parseInt(document.getElementById('editPoin').value)
+      };
 
       try {
-        await db.collection("Users").doc(userSedangDiedit).update({
-          nama: document.getElementById('editNama').value,
-          dewan: document.getElementById('editDewan').value,
-          no_kontrak: document.getElementById('editKontrak').value,
-          poin: parseInt(document.getElementById('editPoin').value)
-        });
+        // 1. Simpan ke Brankas Firebase (Agar aplikasi merespon instan)
+        await db.collection("Users").doc(userSedangDiedit).update(dataBaru);
 
-        Swal.fire('Berhasil!', 'Profil dan Poin berhasil diperbarui.', 'success');
+        // 2. Tembakkan ke Google Apps Script untuk merevisi data di GSheets
+        let payloadGAS = {
+          action: "updateUserSheet",
+          username: userSedangDiedit,
+          namaLengkap: dataBaru.nama,
+          namaDewan: dataBaru.dewan,
+          role: dataBaru.role,
+          noKontrak: dataBaru.no_kontrak,
+          poin: dataBaru.poin
+        };
+
+        fetch(GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify(payloadGAS)
+        }).catch(err => console.log("GSheets Update error: ", err)); // Biarkan berjalan di latar belakang
+
+        // Update data di memori HP agar pencarian berikutnya pakai data baru
+        let index = semuaDataUsers.findIndex(u => u.username === userSedangDiedit);
+        if(index !== -1) {
+          semuaDataUsers[index] = { ...semuaDataUsers[index], ...dataBaru };
+        }
+
+        Swal.fire('Berhasil!', 'Data profil berhasil diperbarui di Firebase dan Google Sheets.', 'success');
       } catch (error) {
         Swal.fire('Gagal', error.message, 'error');
       }
@@ -129,11 +212,9 @@
 
     function infoResetPassword() {
       Swal.fire({
-        icon: 'info',
-        title: 'Prosedur Keamanan',
-        html: `Sistem Firebase mengenkripsi kata sandi tingkat tinggi.<br><br>Untuk me-reset sandi <b>${userSedangDiedit}</b>, Admin harus melakukannya melalui <b>Firebase Console > Authentication</b>.`,
-        confirmButtonColor: '#059669',
-        confirmButtonText: 'Mengerti'
+        icon: 'info', title: 'Prosedur Keamanan',
+        html: `Untuk me-reset kata sandi akun <b>${userSedangDiedit}</b>, Admin Pusat harus melakukannya melalui <b>Firebase Console > Authentication</b> demi keamanan enkripsi.`,
+        confirmButtonColor: '#059669', confirmButtonText: 'Mengerti'
       });
     }
   </script>
