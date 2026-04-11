@@ -89,17 +89,15 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // GANTI DENGAN URL WEB APP BARU ANDA
     const GAS_URL = "https://script.google.com/macros/s/AKfycbxFMGDcYC1_C6z9nojL1IykVxFQsN7FJDVpi0twn2skuOsHPmC2lpuhkAa5ieLyYi-5/exec";
 
     let currentUser = localStorage.getItem('tak_username');
     let currentRole = localStorage.getItem('tak_role') || "";
     if (!currentUser || !currentRole.toLowerCase().includes('koordinator')) { window.location.href = "index.html"; }
 
-    let semuaDataUsers = []; // Tempat menyimpan 150 data TAK di memori HP
+    let semuaDataUsers = []; 
     let userSedangDiedit = "";
 
-    // KETIKA HALAMAN DIBUKA, UNDUH SEMUA DATA TAK 1 KALI (Hemat Kuota)
     document.addEventListener("DOMContentLoaded", async function() {
       try {
         let snapshot = await db.collection("Users").get();
@@ -111,19 +109,17 @@
       }
     });
 
-    // MESIN PENCARI PINTAR (AUTO-COMPLETE)
     function filterPencarian() {
       let keyword = document.getElementById('inputCari').value.toLowerCase();
       let dropdown = document.getElementById('dropdownCari');
       
-      dropdown.innerHTML = ""; // Bersihkan hasil sebelumnya
+      dropdown.innerHTML = ""; 
       
       if (keyword.length < 2) {
         dropdown.classList.add('hidden');
-        return; // Jangan cari kalau baru ketik 1 huruf
+        return; 
       }
 
-      // Saring data berdasarkan kecocokan nama atau username
       let hasilFilter = semuaDataUsers.filter(user => 
         (user.nama && user.nama.toLowerCase().includes(keyword)) || 
         (user.username && user.username.toLowerCase().includes(keyword))
@@ -131,12 +127,10 @@
 
       if (hasilFilter.length > 0) {
         dropdown.classList.remove('hidden');
-        // Tampilkan maksimal 5 nama agar tidak penuh layarnya
         hasilFilter.slice(0, 5).forEach(user => {
           let div = document.createElement('div');
           div.className = "px-4 py-3 border-b hover:bg-yellow-50 cursor-pointer";
           div.innerHTML = `<p class="font-bold text-sm text-gray-800">${user.nama}</p><p class="text-xs text-gray-500">ID: ${user.username} | Poin: ${user.poin}</p>`;
-          // Jika diklik, pilih user ini
           div.onclick = function() { pilihUser(user); };
           dropdown.appendChild(div);
         });
@@ -146,14 +140,12 @@
       }
     }
 
-    // FUNGSI SAAT NAMA DIKLIK DARI DROPDOWN
     function pilihUser(userObj) {
       document.getElementById('inputCari').value = userObj.nama;
-      document.getElementById('dropdownCari').classList.add('hidden'); // Tutup dropdown
+      document.getElementById('dropdownCari').classList.add('hidden'); 
       
       userSedangDiedit = userObj.username;
 
-      // Isi semua form dengan data lengkap
       document.getElementById('editUsername').value = userObj.username;
       document.getElementById('editNama').value = userObj.nama || "";
       document.getElementById('editDewan').value = userObj.dewan || "";
@@ -164,7 +156,6 @@
       document.getElementById('hasilPencarian').classList.remove('hidden');
     }
 
-    // SINKRONISASI 2 ARAH (FIREBASE & GSHEETS)
     async function simpanProfil() {
       if(!userSedangDiedit) return;
       
@@ -179,10 +170,8 @@
       };
 
       try {
-        // 1. Simpan ke Brankas Firebase (Agar aplikasi merespon instan)
         await db.collection("Users").doc(userSedangDiedit).update(dataBaru);
 
-        // 2. Tembakkan ke Google Apps Script untuk merevisi data di GSheets
         let payloadGAS = {
           action: "updateUserSheet",
           username: userSedangDiedit,
@@ -196,9 +185,8 @@
         fetch(GAS_URL, {
           method: 'POST',
           body: JSON.stringify(payloadGAS)
-        }).catch(err => console.log("GSheets Update error: ", err)); // Biarkan berjalan di latar belakang
+        }).catch(err => console.log("GSheets Update error: ", err)); 
 
-        // Update data di memori HP agar pencarian berikutnya pakai data baru
         let index = semuaDataUsers.findIndex(u => u.username === userSedangDiedit);
         if(index !== -1) {
           semuaDataUsers[index] = { ...semuaDataUsers[index], ...dataBaru };
@@ -210,10 +198,11 @@
       }
     }
 
+    // UPDATE: Penambahan pesan hubungi Koordinator
     function infoResetPassword() {
       Swal.fire({
         icon: 'info', title: 'Prosedur Keamanan',
-        html: `Untuk me-reset kata sandi akun <b>${userSedangDiedit}</b>, Admin Pusat harus melakukannya melalui <b>Firebase Console > Authentication</b> demi keamanan enkripsi.`,
+        html: `Untuk me-reset kata sandi akun <b>${userSedangDiedit}</b>, Admin Pusat harus melakukannya melalui <b>Firebase Console > Authentication</b> demi keamanan enkripsi.<br><br><span class="text-red-500 font-bold">Silahkan hubungi Koordinator.</span>`,
         confirmButtonColor: '#059669', confirmButtonText: 'Mengerti'
       });
     }

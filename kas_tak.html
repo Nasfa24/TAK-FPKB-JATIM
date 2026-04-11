@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Kas Bulanan - TAK FPKB</title>
+  <title>Transparansi Kas - TAK FPKB</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
@@ -14,43 +14,44 @@
     tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }
   </script>
 </head>
-<body class="bg-gray-50 min-h-screen pb-10 flex flex-col">
+<body class="bg-gray-100 min-h-screen pb-10 flex flex-col">
 
-  <div class="bg-pkb text-white pt-6 pb-6 px-4 shadow-md flex items-center gap-4 relative z-10">
-    <button onclick="window.location.href='dashboard_tak.html'" class="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
+  <div class="bg-pkb text-white pt-6 pb-6 px-4 shadow-md flex items-center gap-4 relative z-10 border-b-4 border-pkb-dark">
+    <button onclick="window.location.href='dashboard_tak.html'" class="bg-white/20 p-2 rounded-full hover:bg-white/30 transition shadow-sm">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
     </button>
-    <h1 class="text-lg font-bold">Transparansi Kas</h1>
+    <h1 class="text-lg font-bold">Transparansi Kas Bulanan</h1>
   </div>
 
   <div class="px-4 mt-6">
-    <div class="bg-white rounded-2xl shadow-lg p-6 border-t-4 border-pkb">
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Pilih Bulan & Tahun</label>
-        <div class="flex gap-2">
-          <input type="month" id="bulanCari" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none">
-          <button onclick="cariKas()" class="bg-pkb text-white px-4 py-2 rounded-lg font-bold hover:bg-pkb-dark">Cari</button>
-        </div>
-      </div>
-
-      <div id="hasilKas" class="hidden mt-6 pt-4 border-t border-gray-200">
-        <h4 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Rincian Tagihan</h4>
-        <div class="space-y-3">
-          <div class="flex justify-between items-center"><span class="text-gray-600 text-sm">Tagihan Dasar</span><span id="txtDasar" class="font-bold text-gray-800">-</span></div>
-          <div class="flex justify-between items-center"><span class="text-gray-600 text-sm">Denda Keterlambatan</span><span id="txtDenda" class="font-bold text-red-500">-</span></div>
-          <div class="border-b border-dashed border-gray-300 my-2"></div>
-          <div class="flex justify-between items-center"><span class="text-gray-800 font-bold">Total Pembayaran</span><span id="txtTotal" class="font-black text-xl text-pkb">-</span></div>
-          
-          <div class="mt-4 p-3 rounded-lg text-center font-bold text-sm" id="badgeStatus">
-            STATUS
-          </div>
-        </div>
-      </div>
-      
-      <div id="pesanKosong" class="hidden mt-6 text-center text-gray-400 text-sm">
-        Tidak ada data tagihan untuk bulan tersebut.
+    
+    <div class="bg-white rounded-2xl shadow-md p-5 border-t-4 border-pkb mb-5">
+      <label class="block text-xs font-bold text-gray-500 mb-2 uppercase">Pilih Bulan Transparansi</label>
+      <div class="flex gap-2">
+        <input type="month" id="inputBulan" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none font-bold text-gray-700">
+        <button onclick="muatDataKas()" class="bg-pkb hover:bg-pkb-dark text-white px-4 py-2 rounded-lg font-bold shadow-sm">Cek</button>
       </div>
     </div>
+
+    <div id="boxUpload" class="hidden bg-white rounded-2xl shadow-md p-5 border border-gray-200 mb-5 relative overflow-hidden">
+      <div class="absolute top-0 right-0 bg-blue-100 text-blue-700 text-[10px] px-3 py-1 font-bold rounded-bl-lg">Form Setoran</div>
+      <h3 class="font-bold text-gray-800 text-sm mb-3">Upload Bukti Transfer <span id="labelBulanForm" class="text-pkb"></span></h3>
+      
+      <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative">
+        <input type="file" id="fileBukti" accept="image/*,application/pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+        <svg class="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+        <p class="text-xs text-gray-500 font-semibold" id="namaFileTxt">Klik/Tap untuk memilih Foto/PDF</p>
+      </div>
+      <button id="btnUpload" onclick="uploadBuktiKas()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg shadow-sm mt-3 text-sm">
+        Kirim Bukti Transfer
+      </button>
+    </div>
+
+    <h3 class="font-bold text-gray-700 text-sm mb-3 px-1">Daftar Tagihan & Status Pembayaran</h3>
+    <div id="listKas" class="space-y-3">
+      <div class="text-center text-gray-500 text-sm py-10 bg-white rounded-xl shadow border border-gray-200">Silakan pilih bulan lalu klik Cek.</div>
+    </div>
+
   </div>
 
   <script>
@@ -66,60 +67,149 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxFMGDcYC1_C6z9nojL1IykVxFQsN7FJDVpi0twn2skuOsHPmC2lpuhkAa5ieLyYi-5/exec";
+
     let currentUser = localStorage.getItem('tak_username');
     if (!currentUser) { window.location.href = "index.html"; }
 
-    function formatRupiah(angka) {
-      return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+    let noKontrakGlobal = "";
+    let namaLengkapGlobal = localStorage.getItem('tak_nama') || currentUser;
+
+    const namaBulanIndo = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      let now = new Date();
+      let month = (now.getMonth() + 1).toString().padStart(2, '0');
+      document.getElementById('inputBulan').value = `${now.getFullYear()}-${month}`;
+      
+      let doc = await db.collection("Users").doc(currentUser).get();
+      if(doc.exists && doc.data().no_kontrak) { noKontrakGlobal = doc.data().no_kontrak; }
+
+      document.getElementById('fileBukti').addEventListener('change', function(e) {
+        if(e.target.files.length > 0) {
+          document.getElementById('namaFileTxt').innerText = e.target.files[0].name;
+          document.getElementById('namaFileTxt').classList.add('text-pkb');
+        }
+      });
+    });
+
+    async function muatDataKas() {
+      let rawBulan = document.getElementById('inputBulan').value; 
+      if(!rawBulan) return;
+
+      let parts = rawBulan.split("-");
+      let bulanTahunGsheet = parts[1] + "-" + parts[0]; 
+      let namaBulanStr = namaBulanIndo[parseInt(parts[1]) - 1] + " " + parts[0]; 
+
+      document.getElementById('labelBulanForm').innerText = namaBulanStr;
+      document.getElementById('boxUpload').classList.remove('hidden');
+
+      let listContainer = document.getElementById('listKas');
+      listContainer.innerHTML = `<div class="text-center text-gray-500 text-sm py-10 bg-white rounded-xl shadow border border-gray-200">Mengambil data dari server...</div>`;
+
+      try {
+        let response = await fetch(GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: "getTransparansiKas", bulanTahun: bulanTahunGsheet })
+        });
+        
+        let resData = await response.json();
+        
+        if(resData.status !== "success" || resData.data.length === 0) {
+          listContainer.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow text-center border border-gray-200"><p class="text-gray-500 font-bold text-sm">Belum ada data tagihan Kas untuk bulan ini.</p></div>`;
+          return;
+        }
+
+        let htmlList = "";
+        let dataBulanIni = resData.data;
+
+        dataBulanIni.forEach(item => {
+          let isLunas = item.status.toString().toLowerCase().includes("lunas");
+          let badgeColor = isLunas ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700";
+          
+          let totalRp = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(item.total);
+
+          let borderStyle = (item.username === currentUser) ? "border-l-4 border-pkb bg-green-50" : "border border-gray-200 bg-white";
+          let labelAnda = (item.username === currentUser) ? `<span class="bg-pkb text-white text-[9px] px-2 py-0.5 rounded-full uppercase ml-2">Anda</span>` : "";
+
+          htmlList += `
+            <div class="rounded-xl shadow-sm p-4 flex justify-between items-center ${borderStyle}">
+              <div>
+                <p class="font-bold text-gray-800 text-sm mb-1">${item.nama} ${labelAnda}</p>
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase ${badgeColor}">${item.status}</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="text-lg font-black text-gray-700">${totalRp}</p>
+                <p class="text-[9px] text-gray-400 font-bold uppercase">Total Tagihan</p>
+              </div>
+            </div>
+          `;
+        });
+
+        listContainer.innerHTML = htmlList;
+
+      } catch (error) {
+        listContainer.innerHTML = `<div class="text-center text-red-500 font-bold text-sm py-10 bg-white rounded-xl shadow border border-gray-200">Gagal terhubung ke GSheets.</div>`;
+      }
     }
 
-    function cariKas() {
-      const blnValue = document.getElementById('bulanCari').value; // format: YYYY-MM
-      if (!blnValue) { Swal.fire('Perhatian', 'Pilih bulan terlebih dahulu', 'warning'); return; }
+    async function uploadBuktiKas() {
+      let fileInput = document.getElementById('fileBukti');
+      let rawBulan = document.getElementById('inputBulan').value;
+      
+      if (fileInput.files.length === 0) { Swal.fire('Oops!', 'Pilih file bukti transfer (Foto/PDF) dulu.', 'warning'); return; }
+      if (!rawBulan) { Swal.fire('Oops!', 'Pilih bulan setoran dulu.', 'warning'); return; }
 
-      // Ubah YYYY-MM jadi format yang mudah dibaca, e.g., "04-2026" jika diperlukan
-      let parts = blnValue.split("-");
-      let blnFormat = parts[1] + "-" + parts[0]; 
+      let file = fileInput.files[0];
+      let maxSize = 5 * 1024 * 1024; 
+      if (file.size > maxSize) { Swal.fire('File Terlalu Besar', 'Maksimal ukuran file adalah 5MB.', 'error'); return; }
 
-      Swal.fire({ title: 'Mencari data...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+      let parts = rawBulan.split("-");
+      let namaBulanStr = namaBulanIndo[parseInt(parts[1]) - 1] + " " + parts[0]; 
 
-      // Mencari di Koleksi Kas_Bulanan berdasarkan username dan bulan
-      db.collection("Kas_Bulanan")
-        .where("username", "==", currentUser)
-        .where("bulan", "==", blnFormat) // Asumsi nanti data kas disimpan dengan format "MM-YYYY"
-        .get()
-        .then((querySnapshot) => {
-          Swal.close();
-          document.getElementById('hasilKas').classList.add('hidden');
-          document.getElementById('pesanKosong').classList.add('hidden');
+      let btn = document.getElementById('btnUpload');
+      btn.innerHTML = 'Mengunggah ke GDrive...';
+      btn.disabled = true;
+      btn.classList.replace('bg-blue-500', 'bg-gray-400');
 
-          if (querySnapshot.empty) {
-            document.getElementById('pesanKosong').classList.remove('hidden');
-          } else {
-            // Ambil dokumen pertama yang cocok
-            let data = querySnapshot.docs[0].data();
-            
-            document.getElementById('txtDasar').innerText = formatRupiah(data.tagihan_dasar || 0);
-            document.getElementById('txtDenda').innerText = formatRupiah(data.denda || 0);
-            document.getElementById('txtTotal').innerText = formatRupiah(data.total || 0);
-            
-            let badge = document.getElementById('badgeStatus');
-            let status = (data.status || "").toLowerCase();
-            
-            if (status.includes("lunas")) {
-              badge.className = "mt-4 p-3 rounded-lg text-center font-bold text-sm bg-green-100 text-green-700";
-              badge.innerText = "LUNAS";
-            } else {
-              badge.className = "mt-4 p-3 rounded-lg text-center font-bold text-sm bg-red-100 text-red-700";
-              badge.innerText = "BELUM LUNAS";
-            }
+      let reader = new FileReader();
+      reader.onload = async function() {
+        let base64 = reader.result.split(',')[1];
+        let payload = {
+          action: "uploadKas",
+          base64: base64,
+          mimeType: file.type,
+          fileName: file.name,
+          bulanTahunNama: namaBulanStr,
+          noKontrak: noKontrakGlobal || "0000",
+          namaLengkap: namaLengkapGlobal
+        };
 
-            document.getElementById('hasilKas').classList.remove('hidden');
-          }
-        })
-        .catch((error) => {
-          Swal.fire({ icon: 'error', title: 'Gagal', text: error.message });
-        });
+        try {
+          let response = await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) });
+          let result = await response.json();
+
+          if (result.status === "success") {
+            Swal.fire('Terkirim!', 'Bukti transfer berhasil diunggah. Menunggu konfirmasi Bendahara.', 'success');
+            document.getElementById('namaFileTxt').innerText = "Klik/Tap untuk memilih Foto/PDF";
+            document.getElementById('namaFileTxt').classList.remove('text-pkb');
+            fileInput.value = "";
+          } else { throw new Error(result.message); }
+        } catch (err) {
+          Swal.fire('Gagal Upload', err.toString(), 'error');
+        } finally {
+          btn.innerHTML = 'Kirim Bukti Transfer';
+          btn.disabled = false;
+          btn.classList.replace('bg-gray-400', 'bg-blue-500');
+        }
+      };
+      reader.onerror = function() {
+        Swal.fire('Error', 'Gagal membaca file', 'error');
+        btn.innerHTML = 'Kirim Bukti Transfer'; btn.disabled = false; btn.classList.replace('bg-gray-400', 'bg-blue-500');
+      };
+      reader.readAsDataURL(file);
     }
   </script>
 </body>
