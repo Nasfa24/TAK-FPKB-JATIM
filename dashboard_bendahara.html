@@ -53,6 +53,21 @@
 
   <div class="px-4 mt-6">
     
+    <div class="bg-white rounded-2xl shadow-md p-5 border-t-4 border-blue-500 mb-6">
+      <h3 class="text-gray-800 font-bold mb-2 flex items-center gap-2">
+        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        Generator Tagihan Bulanan
+      </h3>
+      <p class="text-xs text-gray-500 mb-3">Buat tagihan kas otomatis untuk semua anggota TAK (1x Klik).</p>
+      
+      <div class="flex gap-2">
+        <input type="month" id="inputBulanMassal" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold">
+        <button onclick="buatTagihanMassal()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-sm text-sm whitespace-nowrap">
+          Generate
+        </button>
+      </div>
+    </div>
+
     <div class="bg-white rounded-2xl shadow-md p-4 border-l-4 border-emerald-500 mb-6 flex flex-col gap-3">
       <h3 class="text-sm font-bold text-gray-800">Pusat Validasi Tagihan</h3>
       <p class="text-xs text-gray-500 mb-1">Verifikasi bukti setor dari anggota TAK atau edit data secara manual:</p>
@@ -158,6 +173,11 @@
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById('inputTanggalT').value = new Date().toLocaleDateString('en-CA');
 
+      // Set default bulan untuk Generator
+      let now = new Date();
+      let month = (now.getMonth() + 1).toString().padStart(2, '0');
+      document.getElementById('inputBulanMassal').value = `${now.getFullYear()}-${month}`;
+
       document.getElementById('fileKwitansi').addEventListener('change', function(e) {
         if(e.target.files.length > 0) {
           document.getElementById('namaFileTxtT').innerText = e.target.files[0].name;
@@ -165,9 +185,8 @@
         }
       });
 
-      // UPDATE: Skrip Otomatis Titik (Format Ribuan)
       document.getElementById('inputNominal').addEventListener('input', function(e) {
-        let value = this.value.replace(/[^0-9]/g, ''); // Buang semua huruf/karakter aneh
+        let value = this.value.replace(/[^0-9]/g, ''); 
         if(value) {
           this.value = new Intl.NumberFormat('id-ID').format(value);
         } else {
@@ -177,6 +196,40 @@
 
       pantauBukuKas();
     });
+
+    async function buatTagihanMassal() {
+      let rawBulan = document.getElementById('inputBulanMassal').value;
+      if(!rawBulan) return;
+
+      let parts = rawBulan.split("-");
+      let blnTahunFormat = parts[1] + "-" + parts[0]; 
+      
+      Swal.fire({
+        title: `Buat Tagihan ${blnTahunFormat}?`,
+        text: "Sistem akan membuat tagihan Rp 50.000 untuk seluruh TAK beserta rumus denda otomatis di GSheets.",
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: '#3b82f6', confirmButtonText: 'Ya, Generate Sekarang'
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          Swal.fire({ title: 'Menciptakan Tagihan...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+          try {
+            let response = await fetch(GAS_URL, {
+              method: 'POST',
+              body: JSON.stringify({ action: "buatTagihanMassal", bulanTahun: blnTahunFormat })
+            });
+            let res = await response.json();
+            
+            if(res.status === "success") {
+              Swal.fire('Selesai!', res.message, 'success');
+            } else {
+              throw new Error(res.message);
+            }
+          } catch(err) {
+            Swal.fire('Gagal', err.toString(), 'error');
+          }
+        }
+      });
+    }
 
     function gantiWarnaInput() {
       let tipe = document.getElementById('inputTipe').value;
@@ -254,7 +307,6 @@
       let tipe = document.getElementById('inputTipe').value;
       let tgl = document.getElementById('inputTanggalT').value;
       
-      // UPDATE: Menghilangkan titik sebelum disimpan ke database
       let rawNominal = document.getElementById('inputNominal').value.replace(/\./g, '');
       let nominal = parseInt(rawNominal);
       
@@ -304,19 +356,17 @@
           let diinputOleh = localStorage.getItem('tak_nama') || currentUser;
           let linkFile = result.fileUrl || "Lihat Langsung di Folder GDrive";
 
-          // 1. Simpan ke Firebase (Untuk Live Update HP)
           await db.collection("Kas_Transaksi").doc(idTx).set({
             id_transaksi: idTx,
             tipe: tipe,
             tanggal: tgl,
-            nominal: nominal, // Menggunakan variabel nominal yang sudah dibersihkan titiknya
+            nominal: nominal, 
             keterangan: keterangan,
             file_url: linkFile, 
             diinput_oleh: diinputOleh,
             waktu_input: firebase.firestore.FieldValue.serverTimestamp()
           });
 
-          // 2. MENGIRIM PERINTAH KE CODE.GS UNTUK MENULIS DI BUKU BESAR
           let payloadBuku = {
             action: "catatBukuBesar",
             idTx: idTx,
