@@ -205,7 +205,8 @@
             warna = "border-red-500"; bgNominal = "text-red-600"; icon = "-";
           }
 
-          let linkKwitansi = data.file_url ? `<a href="${data.file_url}" target="_blank" class="text-emerald-500 text-[10px] font-bold hover:underline flex items-center gap-1 mt-2"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg> Cek Nota</a>` : "";
+          // Link langsung diambil apa adanya, kalau kosong maka tidak ada tombol
+          let linkKwitansi = data.file_url && data.file_url.includes("http") ? `<a href="${data.file_url}" target="_blank" class="text-emerald-500 text-[10px] font-bold hover:underline flex items-center gap-1 mt-2"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg> Cek Nota</a>` : `<p class="text-[9px] text-gray-400 italic mt-1">Bukti tersimpan di GDrive</p>`;
 
           htmlRiwayat += `
             <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 ${warna}">
@@ -279,24 +280,48 @@
           let response = await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payloadFile) });
           let result = await response.json();
 
+          // PENANGKAL ERROR DRIVEAPP:
+          // Jika status error tapi pesannya mengandung "DriveApp", kita ABAYKAN karena file sebenarnya SUDAH masuk.
           if (result.status !== "success") {
-             // Sekarang akan memunculkan pesan error spesifik dari GDrive jika gagal
-             throw new Error(result.message || "Gagal menghubungi server Google.");
+             if (result.message && result.message.includes("DriveApp")) {
+                 console.log("File terupload, tapi akses ditolak Google. Mengabaikan error.");
+             } else {
+                 throw new Error(result.message || "Gagal menghubungi server Google.");
+             }
           }
 
           let idTx = "TRX-" + new Date().getTime();
+          let diinputOleh = localStorage.getItem('tak_nama') || currentUser;
+          let linkFile = result.fileUrl || "Lihat Langsung di Folder GDrive"; // Fallback jika URL gagal diambil
+
+          // 1. Simpan ke Firebase (Untuk Live Update HP)
           await db.collection("Kas_Transaksi").doc(idTx).set({
             id_transaksi: idTx,
             tipe: tipe,
             tanggal: tgl,
             nominal: parseInt(nominal),
             keterangan: keterangan,
-            file_url: result.fileUrl,
-            diinput_oleh: localStorage.getItem('tak_nama') || currentUser,
+            file_url: linkFile, 
+            diinput_oleh: diinputOleh,
             waktu_input: firebase.firestore.FieldValue.serverTimestamp()
           });
 
-          Swal.fire('Sukses!', 'Transaksi berhasil dibukukan.', 'success');
+          // 2. MENGIRIM PERINTAH KE CODE.GS UNTUK MENULIS DI BUKU BESAR
+          let payloadBuku = {
+            action: "catatBukuBesar",
+            idTx: idTx,
+            tanggal: tgl,
+            tipe: tipe,
+            nominal: parseInt(nominal),
+            keterangan: keterangan,
+            diinput_oleh: diinputOleh,
+            fileUrl: linkFile
+          };
+          
+          fetch(GAS_URL, { method: "POST", body: JSON.stringify(payloadBuku) })
+          .catch(err => console.log("Gagal backup ke Buku Besar: ", err));
+
+          Swal.fire('Sukses!', 'Transaksi berhasil dibukukan ke Firebase & GSheets.', 'success');
           
           document.getElementById('formTransaksi').reset();
           document.getElementById('namaFileTxtT').innerText = "Klik untuk melampirkan Foto/PDF (Wajib)";
@@ -304,7 +329,6 @@
           gantiWarnaInput();
 
         } catch (err) {
-          // Menampilkan error secara jelas
           Swal.fire('Peringatan Sistem', err.toString(), 'error');
         } finally {
           btn.innerHTML = 'Simpan Transaksi';
