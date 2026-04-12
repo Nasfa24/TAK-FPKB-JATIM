@@ -279,7 +279,10 @@
           let response = await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payloadFile) });
           let result = await response.json();
 
-          if (result.status !== "success") throw new Error("Gagal upload file ke GDrive.");
+          if (result.status !== "success") {
+             // Sekarang akan memunculkan pesan error spesifik dari GDrive jika gagal
+             throw new Error(result.message || "Gagal menghubungi server Google.");
+          }
 
           let idTx = "TRX-" + new Date().getTime();
           await db.collection("Kas_Transaksi").doc(idTx).set({
@@ -301,7 +304,8 @@
           gantiWarnaInput();
 
         } catch (err) {
-          Swal.fire('Gagal', err.toString(), 'error');
+          // Menampilkan error secara jelas
+          Swal.fire('Peringatan Sistem', err.toString(), 'error');
         } finally {
           btn.innerHTML = 'Simpan Transaksi';
           btn.disabled = false;
