@@ -28,7 +28,10 @@
 
     <div class="flex justify-between items-center mb-4 relative z-10">
       <h1 class="text-xl font-bold text-emerald-400">Ruang Bendahara</h1>
-      <button onclick="keluarKeMenu()" class="bg-white/20 hover:bg-white/30 text-white text-xs px-4 py-2 rounded-full transition shadow-sm font-bold">Kembali</button>
+      <div class="flex gap-2">
+        <button id="btnKembali" onclick="window.location.href='dashboard_koordinator.html'" class="hidden bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-full transition shadow-sm font-bold">Kembali</button>
+        <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-full transition shadow-sm font-bold">Keluar</button>
+      </div>
     </div>
     
     <div class="relative z-10">
@@ -172,12 +175,16 @@
     } else {
       document.getElementById('mainBody').classList.remove('hidden');
       document.getElementById('namaBendahara').innerText = localStorage.getItem('tak_nama');
+      
+      // UPDATE: Tampilkan tombol kembali jika dia koordinator
+      if (currentRole.toLowerCase().includes('koordinator')) {
+        document.getElementById('btnKembali').classList.remove('hidden');
+      }
     }
 
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById('inputTanggalT').value = new Date().toLocaleDateString('en-CA');
 
-      // Set default bulan untuk Generator
       let now = new Date();
       let month = (now.getMonth() + 1).toString().padStart(2, '0');
       document.getElementById('inputBulanMassal').value = `${now.getFullYear()}-${month}`;
@@ -407,12 +414,19 @@
       reader.readAsDataURL(file);
     }
 
-    function keluarKeMenu() {
-      if (currentRole.toLowerCase().includes('koordinator')) {
-        window.location.href = 'dashboard_koordinator.html';
-      } else {
-        window.location.href = 'index.html'; 
-      }
+    // UPDATE: FUNGSI LOGOUT YANG BENAR
+    function logout() {
+      Swal.fire({
+        title: 'Keluar Aplikasi?', icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#059669', cancelButtonColor: '#d33', confirmButtonText: 'Ya, Keluar!'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          localStorage.clear();
+          firebase.auth().signOut().then(() => {
+            window.location.href = "index.html";
+          });
+        }
+      })
     }
   </script>
 </body>
