@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Verifikasi Setoran Kas - Bendahara</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <script>tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }</script>
+</head>
+<body class="bg-gray-100 min-h-screen pb-10 flex flex-col">
+
+  <div class="bg-gray-800 text-white pt-6 pb-6 px-4 shadow-md flex items-center gap-4 relative z-10 border-b-4 border-emerald-500">
+    <button onclick="window.location.href='dashboard_bendahara.html'" class="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+    </button>
+    <h1 class="text-lg font-bold text-emerald-400">Verifikasi Setoran Kas</h1>
+  </div>
+
+  <div class="px-4 mt-6">
+    <div class="flex justify-between items-center mb-4 px-1">
+      <h2 class="font-bold text-gray-700 text-sm">Menunggu Validasi Bendahara</h2>
+      <span id="badgeCount" class="bg-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full">0</span>
+    </div>
+
+    <div id="listSetoran" class="space-y-4">
+      <div class="text-center text-gray-500 text-sm py-10">Memuat data setoran...</div>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
+      authDomain: "apps-tak-fpkb.firebaseapp.com",
+      projectId: "apps-tak-fpkb",
+      storageBucket: "apps-tak-fpkb.firebasestorage.app",
+      messagingSenderId: "370368024191",
+      appId: "1:370368024191:web:ece099f60a9064a968394a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxFMGDcYC1_C6z9nojL1IykVxFQsN7FJDVpi0twn2skuOsHPmC2lpuhkAa5ieLyYi-5/exec";
+
+    let currentRole = localStorage.getItem('tak_role') || "";
+    if (!currentRole.toLowerCase().includes('bendahara') && !currentRole.toLowerCase().includes('koordinator')) { 
+      window.location.href = "index.html"; 
+    }
+
+    document.addEventListener("DOMContentLoaded", loadSetoranPending);
+
+    async function loadSetoranPending() {
+      const listContainer = document.getElementById('listSetoran');
+      try {
+        let snapshot = await db.collection("Setoran_Kas")
+                               .where("status", "==", "Menunggu Validasi")
+                               .get();
+        
+        document.getElementById('badgeCount').innerText = snapshot.size;
+        listContainer.innerHTML = "";
+
+        if (snapshot.empty) {
+          listContainer.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow text-center border border-gray-200"><p class="text-gray-500 font-bold text-sm">Semua setoran sudah divalidasi!</p></div>`;
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          let data = doc.data();
+          let docId = doc.id;
+          let tglUpload = data.waktu_upload ? data.waktu_upload.toDate().toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : "-";
+          
+          let parts = data.bulan_tahun.split("-");
+          let bulanTahunGsheet = parts[1] + "-" + parts[0]; 
+          let namaBulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"][parseInt(parts[1])-1] + " " + parts[0];
+
+          listContainer.innerHTML += `
+            <div class="bg-white rounded-2xl shadow-md p-4 border-l-4 border-emerald-500">
+              <p class="text-xs text-gray-500 mb-1">Setoran Bulan: <span class="font-bold text-gray-800">${namaBulan}</span></p>
+              <h3 class="font-bold text-gray-800 text-lg mb-1">${data.nama}</h3>
+              <p class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded inline-block mb-3">Waktu Upload: ${tglUpload}</p>
+
+              <div class="flex flex-col gap-2">
+                <button onclick="cekTagihanDanValidasi('${docId}', '${data.username}', '${data.nama}', '${bulanTahunGsheet}', '${data.file_url}')" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold py-3 rounded-lg transition shadow-sm flex justify-center items-center gap-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  Cek Data & Validasi Lunas
+                </button>
+                <a href="${data.file_url}" target="_blank" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold py-2 rounded-lg transition text-center border border-gray-300">
+                  Lihat Foto/PDF Bukti
+                </a>
+              </div>
+            </div>
+          `;
+        });
+      } catch (error) {
+        listContainer.innerHTML = `<div class="text-center text-red-500 font-bold">Gagal memuat data: ${error.message}</div>`;
+      }
+    }
+
+    async function cekTagihanDanValidasi(docId, username, namaUser, bulanTahun, fileUrl) {
+      Swal.fire({ title: 'Menarik Nominal Tagihan...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+      
+      try {
+        // 1. Tarik info nominal dari GSheets dulu
+        let response = await fetch(GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: "getTransparansiKas", bulanTahun: bulanTahun })
+        });
+        let resData = await response.json();
+        
+        let tagihanUser = resData.data.find(u => u.username === username);
+        if(!tagihanUser) throw new Error("Data tagihan tidak ditemukan di GSheets untuk bulan tersebut.");
+
+        let totalRp = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(tagihanUser.total);
+
+        // 2. Munculkan konfirmasi Validasi
+        Swal.fire({
+          title: `Verifikasi Setoran`,
+          html: `<p class="text-sm text-gray-600 mb-2">Nama: <b>${namaUser}</b></p>
+                 <p class="text-sm text-gray-600 mb-4">Total Tagihan: <b class="text-xl text-red-600">${totalRp}</b></p>
+                 <p class="text-xs text-gray-500">Apakah uang sudah masuk ke rekening dan bukti valid?</p>`,
+          icon: 'question', showCancelButton: true,
+          confirmButtonColor: '#059669', confirmButtonText: 'Ya, Tandai LUNAS!', cancelButtonText: 'Belum Valid'
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            Swal.fire({ title: 'Menyimpan & Update GSheets...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+            
+            // 3. Tembak GSheets untuk update Status = LUNAS
+            let gasRes = await fetch(GAS_URL, {
+              method: 'POST',
+              body: JSON.stringify({ action: "validasiKasLunas", username: username, bulanTahun: bulanTahun })
+            });
+            let gasData = await gasRes.json();
+            if (gasData.status !== "success") throw new Error(gasData.message);
+
+            // 4. Update status di Firebase agar hilang dari antrean
+            await db.collection("Setoran_Kas").doc(docId).update({ status: "Lunas (Terverifikasi)" });
+
+            Swal.fire('Sukses!', `${namaUser} telah ditandai LUNAS.`, 'success');
+            loadSetoranPending(); // Refresh data
+          }
+        });
+
+      } catch (error) {
+        Swal.fire('Gagal', error.message, 'error');
+      }
+    }
+  </script>
+</body>
+</html>

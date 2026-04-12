@@ -38,6 +38,10 @@
           Unggah Laporan
         </button>
       </form>
+      
+      <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg mt-5 w-full">
+        <p class="text-xs text-blue-800 font-semibold text-center"><span class="font-bold">Info Kedisiplinan:</span> Batas akhir unggah Laporan Kinerja Digital adalah <span class="font-bold underline">tanggal 5 bulan berikutnya</span>. Jika lewat dari itu, status Anda akan tercatat "Terlambat".</p>
+      </div>
     </div>
   </div>
 
@@ -87,6 +91,12 @@
       
       if (!fileInput) return;
 
+      // Batasan ukuran file (misal maksimal 5MB)
+      if (fileInput.size > 5 * 1024 * 1024) {
+        Swal.fire('Terlalu Besar', 'Maksimal ukuran file laporan adalah 5MB.', 'error');
+        return;
+      }
+
       btn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Mengirim ke GDrive...`;
       btn.disabled = true;
 
@@ -121,13 +131,36 @@
           throw new Error(gasResult.message);
         }
 
-        // 4. Catat Jejaknya di Firestore Database
-        let tanggalHariIni = new Date().getDate();
-        let statusDigital = (tanggalHariIni <= 25) ? "Tepat Waktu" : "Telat";
-        let poinDapat = (statusDigital === "Tepat Waktu") ? 5 : 0;
+        // ========================================================
+        // 4. LOGIKA KETERLAMBATAN (TANGGAL 5 BULAN BERIKUTNYA)
+        // ========================================================
+        let parts = bulanValue.split("-"); // misal "2026-03"
+        let tahunLaporan = parseInt(parts[0]);
+        let bulanLaporan = parseInt(parts[1]); 
 
-        await db.collection("Laporan_Kinerja").add({
-          id_laporan: "LAP-" + new Date().getTime(),
+        // Deadline adalah tanggal 5 bulan BERIKUTNYA.
+        // Jika laporannya Desember (12), maka deadlinenya Januari tahun depannya.
+        let deadlineTahun = bulanLaporan === 12 ? tahunLaporan + 1 : tahunLaporan;
+        let deadlineBulan = bulanLaporan === 12 ? 0 : bulanLaporan; // 0 karena indeks bulan Date() JavaScript mulai dari 0 (Jan=0, Feb=1, dst)
+        
+        // Buat objek waktu Batas Akhir: Tgl 5, Jam 23:59:59
+        let batasAkhir = new Date(deadlineTahun, deadlineBulan, 5, 23, 59, 59); 
+        let waktuUpload = new Date(); // Waktu saat TAK pencet tombol upload
+
+        let statusDigital = "Tepat Waktu";
+        let poinDapat = 5;
+
+        // Jika waktu upload lebih besar (lebih lambat) dari batas akhir, maka Telat
+        if (waktuUpload > batasAkhir) {
+            statusDigital = "Terlambat";
+            poinDapat = 0; // Jika terlambat poin hangus
+        }
+
+        let idLaporan = "LAP-" + new Date().getTime();
+
+        // 5. Catat Jejaknya di Firestore Database
+        await db.collection("Laporan_Kinerja").doc(idLaporan).set({
+          id_laporan: idLaporan,
           bulan_tahun: bulanValue, // YYYY-MM
           username: currentUser,
           nama: currentNama,
