@@ -52,6 +52,28 @@
   </div>
 
   <div class="px-4 mt-6">
+    
+    <div class="bg-white rounded-2xl shadow-md p-4 border-l-4 border-emerald-500 mb-6 flex flex-col gap-3">
+      <h3 class="text-sm font-bold text-gray-800">Pusat Validasi Tagihan</h3>
+      <p class="text-xs text-gray-500 mb-1">Verifikasi bukti setor dari anggota TAK atau edit data secara manual:</p>
+      
+      <button onclick="window.location.href='verifikasi_kas.html'" class="w-full bg-emerald-500 text-white py-3 rounded-lg font-bold text-sm shadow-md hover:bg-emerald-600 transition flex justify-center items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        Verifikasi Setoran TAK Baru
+      </button>
+
+      <div class="grid grid-cols-2 gap-2 mt-1">
+        <a href="https://docs.google.com/spreadsheets/d/1_C6z9nojL1IykVxFQsN7FJDVpi0twn2skuOsHPmC2lpuhkAa5ieLyYi-5/edit" target="_blank" class="bg-gray-100 text-gray-700 border border-gray-200 py-2 rounded-lg font-bold text-[10px] uppercase text-center hover:bg-gray-200 transition flex flex-col justify-center items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          GSheets (Edit Manual)
+        </a>
+        <a href="https://drive.google.com/drive/folders/1659qqLjRgit6hMfPKpHySshO6Nri3WWb" target="_blank" class="bg-gray-100 text-gray-700 border border-gray-200 py-2 rounded-lg font-bold text-[10px] uppercase text-center hover:bg-gray-200 transition flex flex-col justify-center items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+          Arsip GDrive (Bukti)
+        </a>
+      </div>
+    </div>
+
     <div class="bg-white rounded-2xl shadow-md p-5 border-t-4 border-emerald-500 mb-6">
       <h3 class="text-gray-800 font-bold mb-4 border-b pb-2 flex items-center gap-2">
         <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -120,13 +142,11 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // MASUKKAN LINK APPS SCRIPT ANDA DI SINI
     const GAS_URL = "https://script.google.com/macros/s/AKfycbxFMGDcYC1_C6z9nojL1IykVxFQsN7FJDVpi0twn2skuOsHPmC2lpuhkAa5ieLyYi-5/exec";
 
     let currentUser = localStorage.getItem('tak_username');
     let currentRole = localStorage.getItem('tak_role') || "";
     
-    // Keamanan: Hanya Bendahara atau Koordinator yang boleh masuk
     if (!currentUser || (!currentRole.toLowerCase().includes('bendahara') && !currentRole.toLowerCase().includes('koordinator'))) {
       Swal.fire('Akses Ditolak', 'Anda tidak memiliki otoritas Bendahara.', 'error').then(() => {
         window.location.href = "index.html"; 
@@ -137,10 +157,8 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      // Set default tanggal hari ini
       document.getElementById('inputTanggalT').value = new Date().toLocaleDateString('en-CA');
 
-      // Teks file input
       document.getElementById('fileKwitansi').addEventListener('change', function(e) {
         if(e.target.files.length > 0) {
           document.getElementById('namaFileTxtT').innerText = e.target.files[0].name;
@@ -148,7 +166,6 @@
         }
       });
 
-      // Dengarkan perubahan database secara REALTIME (Mata Dewa)
       pantauBukuKas();
     });
 
@@ -166,7 +183,6 @@
       return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
     }
 
-    // LISTENER REALTIME FIREBASE
     function pantauBukuKas() {
       db.collection("Kas_Transaksi").orderBy("waktu_input", "desc").onSnapshot((snapshot) => {
         let totalM = 0;
@@ -179,7 +195,7 @@
 
         snapshot.forEach(doc => {
           let data = doc.data();
-          let tglStr = data.tanggal.split("-").reverse().join("-"); // YYYY-MM-DD to DD-MM-YYYY
+          let tglStr = data.tanggal.split("-").reverse().join("-"); 
 
           if (data.tipe === "Masuk") {
             totalM += parseInt(data.nominal);
@@ -209,10 +225,8 @@
           `;
         });
 
-        // Kalkulasi Saldo
         let saldoAkhir = totalM - totalK;
 
-        // Update Layar
         document.getElementById('totalMasuk').innerText = formatRp(totalM);
         document.getElementById('totalKeluar').innerText = formatRp(totalK);
         document.getElementById('saldoUtama').innerText = formatRp(saldoAkhir);
@@ -251,7 +265,6 @@
       reader.onload = async function() {
         let base64 = reader.result.split(',')[1];
         
-        // Payload khusus untuk upload Bukti Transaksi ke GDrive
         let payloadFile = {
           action: "uploadBuktiTransaksi",
           base64: base64,
@@ -263,13 +276,11 @@
         };
 
         try {
-          // 1. Upload file ke Apps Script (GDrive)
           let response = await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payloadFile) });
           let result = await response.json();
 
           if (result.status !== "success") throw new Error("Gagal upload file ke GDrive.");
 
-          // 2. Simpan Data ke Firebase
           let idTx = "TRX-" + new Date().getTime();
           await db.collection("Kas_Transaksi").doc(idTx).set({
             id_transaksi: idTx,
@@ -284,7 +295,6 @@
 
           Swal.fire('Sukses!', 'Transaksi berhasil dibukukan.', 'success');
           
-          // Reset Form
           document.getElementById('formTransaksi').reset();
           document.getElementById('namaFileTxtT').innerText = "Klik untuk melampirkan Foto/PDF (Wajib)";
           document.getElementById('namaFileTxtT').classList.remove('text-emerald-600');
@@ -306,11 +316,10 @@
     }
 
     function keluarKeMenu() {
-      // Jika dia Koordinator yang numpang masuk, kembalikan ke dashboard koordinator
       if (currentRole.toLowerCase().includes('koordinator')) {
         window.location.href = 'dashboard_koordinator.html';
       } else {
-        window.location.href = 'index.html'; // Bendahara khusus kembali ke login
+        window.location.href = 'index.html'; 
       }
     }
   </script>

@@ -63,7 +63,7 @@
         listContainer.innerHTML = "";
 
         if (snapshot.empty) {
-          listContainer.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow text-center border border-gray-200"><p class="text-gray-500 font-bold text-sm">Semua setoran sudah divalidasi!</p></div>`;
+          listContainer.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow text-center border border-gray-200"><p class="text-gray-500 font-bold text-sm">Yeay! Semua setoran sudah divalidasi!</p></div>`;
           return;
         }
 
@@ -73,7 +73,7 @@
           let tglUpload = data.waktu_upload ? data.waktu_upload.toDate().toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : "-";
           
           let parts = data.bulan_tahun.split("-");
-          let bulanTahunGsheet = parts[1] + "-" + parts[0]; 
+          let bulanTahunGsheet = parts[1] + "-" + parts[0]; // Konversi YYYY-MM ke MM-YYYY untuk GSheets
           let namaBulan = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"][parseInt(parts[1])-1] + " " + parts[0];
 
           listContainer.innerHTML += `
@@ -103,7 +103,7 @@
       Swal.fire({ title: 'Menarik Nominal Tagihan...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
       
       try {
-        // 1. Tarik info nominal dari GSheets dulu
+        // 1. Tarik info nominal tagihan aslinya dari GSheets
         let response = await fetch(GAS_URL, {
           method: 'POST',
           body: JSON.stringify({ action: "getTransparansiKas", bulanTahun: bulanTahun })
@@ -115,12 +115,12 @@
 
         let totalRp = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(tagihanUser.total);
 
-        // 2. Munculkan konfirmasi Validasi
+        // 2. Munculkan konfirmasi Validasi kepada Bendahara
         Swal.fire({
           title: `Verifikasi Setoran`,
           html: `<p class="text-sm text-gray-600 mb-2">Nama: <b>${namaUser}</b></p>
-                 <p class="text-sm text-gray-600 mb-4">Total Tagihan: <b class="text-xl text-red-600">${totalRp}</b></p>
-                 <p class="text-xs text-gray-500">Apakah uang sudah masuk ke rekening dan bukti valid?</p>`,
+                 <p class="text-sm text-gray-600 mb-4">Total Tagihan di GSheet: <b class="text-xl text-red-600">${totalRp}</b></p>
+                 <p class="text-xs text-gray-500">Apakah uang sudah masuk ke rekening dan buktinya valid?</p>`,
           icon: 'question', showCancelButton: true,
           confirmButtonColor: '#059669', confirmButtonText: 'Ya, Tandai LUNAS!', cancelButtonText: 'Belum Valid'
         }).then(async (result) => {
@@ -135,11 +135,11 @@
             let gasData = await gasRes.json();
             if (gasData.status !== "success") throw new Error(gasData.message);
 
-            // 4. Update status di Firebase agar hilang dari antrean
+            // 4. Update status di Firebase agar hilang dari antrean pending
             await db.collection("Setoran_Kas").doc(docId).update({ status: "Lunas (Terverifikasi)" });
 
             Swal.fire('Sukses!', `${namaUser} telah ditandai LUNAS.`, 'success');
-            loadSetoranPending(); // Refresh data
+            loadSetoranPending(); // Refresh antrean
           }
         });
 
