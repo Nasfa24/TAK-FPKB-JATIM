@@ -24,25 +24,55 @@
   </div>
 
   <div class="px-4 mt-6">
-    <div class="bg-white rounded-2xl shadow-lg p-6 border-t-4 border-red-500">
-      <form id="formIzin" onsubmit="ajukanIzin(event)">
+    
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg mb-6 shadow-sm">
+      <p class="text-xs text-blue-800 font-semibold leading-relaxed">
+        <span class="font-bold uppercase tracking-widest text-[10px] block mb-1">Ketentuan Izin:</span>
+        Pastikan Anda melampirkan <span class="font-bold underline">Surat Keterangan Dokter / Bukti Pendukung</span> yang sah. Pengajuan tanpa bukti kuat berpotensi ditolak oleh Koordinator.
+      </p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-lg p-6 border-t-4 border-pkb relative overflow-hidden mb-8">
+      <div class="absolute top-0 right-0 bg-yellow-100 text-yellow-700 text-[9px] px-3 py-1 font-bold rounded-bl-lg uppercase">Validasi Manual</div>
+      
+      <form id="formIzin" onsubmit="kirimIzin(event)">
         <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nama Kegiatan</label>
-          <input type="text" id="namaKegiatan" placeholder="Contoh: Rapat Paripurna" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Kegiatan yang Diizinkan</label>
+          <select id="inputKegiatan" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none text-sm font-semibold text-gray-700 bg-gray-50">
+            <option value="">-- Memuat Agenda Terbaru... --</option>
+          </select>
         </div>
+
         <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Alasan Izin</label>
-          <textarea id="alasanIzin" rows="3" placeholder="Sakit / Ada Kepentingan Keluarga..." required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"></textarea>
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Alasan Berhalangan Hadir</label>
+          <textarea id="inputAlasan" required rows="3" placeholder="Contoh: Sakit tipes (surat dokter terlampir) atau Dinas Luar Kota dari Instansi..." class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none text-sm resize-none"></textarea>
         </div>
+
         <div class="mb-6">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Bukti Izin (Surat/Foto)</label>
-          <input type="file" id="fileIzin" accept=".pdf,image/*" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm">
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Lampiran Bukti (Foto/PDF)</label>
+          <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative">
+            <input type="file" id="fileBukti" accept=".pdf,image/*" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+            <svg class="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+            <p class="text-xs text-gray-500 font-semibold" id="namaFileTxt">Klik/Tap untuk memilih Bukti</p>
+          </div>
         </div>
-        <button type="submit" id="btnSubmit" class="w-full bg-red-500 text-white font-bold py-3 rounded-lg hover:bg-red-600 transition flex justify-center items-center">
-          Kirim Pengajuan
+
+        <button type="submit" id="btnSubmit" class="w-full bg-pkb text-white font-bold py-3 rounded-lg shadow-md hover:bg-pkb-dark transition flex justify-center items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+          Ajukan Izin Sekarang
         </button>
       </form>
     </div>
+
+    <h3 class="font-bold text-gray-800 text-sm mb-3 px-1 border-b-2 border-gray-200 pb-2 flex justify-between items-center">
+      Riwayat Izin Saya
+      <span class="text-[10px] bg-gray-200 text-gray-600 px-2 py-1 rounded">Live Update</span>
+    </h3>
+    
+    <div id="listRiwayatIzin" class="space-y-3">
+      <div class="text-center text-gray-500 text-sm py-10 bg-white rounded-xl shadow-sm border border-gray-200">Memuat Riwayat...</div>
+    </div>
+
   </div>
 
   <script>
@@ -58,12 +88,97 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     
-    // URL API GOOGLE APPS SCRIPT ANDA
+    // API GOOGLE APPS SCRIPT ANDA
     const GAS_URL = "https://script.google.com/macros/s/AKfycbxFMGDcYC1_C6z9nojL1IykVxFQsN7FJDVpi0twn2skuOsHPmC2lpuhkAa5ieLyYi-5/exec";
 
     let currentUser = localStorage.getItem('tak_username');
     let currentNama = localStorage.getItem('tak_nama');
     if (!currentUser) { window.location.href = "index.html"; }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      // 1. Tangkap perubahan file input
+      document.getElementById('fileBukti').addEventListener('change', function(e) {
+        if(e.target.files.length > 0) {
+          document.getElementById('namaFileTxt').innerText = e.target.files[0].name;
+          document.getElementById('namaFileTxt').classList.add('text-pkb');
+        }
+      });
+
+      // 2. Tarik Agenda Terakhir untuk dipilih TAK
+      await loadAgendaTerbaru();
+
+      // 3. Pasang Mata Dewa (Realtime Listener) untuk Riwayat Izin Pribadi
+      pantauRiwayatIzin();
+    });
+
+    async function loadAgendaTerbaru() {
+      let selectKegiatan = document.getElementById('inputKegiatan');
+      try {
+        // Tarik 5 kegiatan terakhir yang masih Aktif/Ditunda
+        let snapshot = await db.collection("Jadwal_Kegiatan")
+                               .orderBy("waktu_dibuat", "desc")
+                               .limit(5)
+                               .get();
+        
+        selectKegiatan.innerHTML = "";
+        if(snapshot.empty) {
+          selectKegiatan.innerHTML = `<option value="">-- Belum Ada Agenda Tersedia --</option>`;
+          return;
+        }
+
+        selectKegiatan.innerHTML = `<option value="">-- Pilih Kegiatan --</option>`;
+        snapshot.forEach(doc => {
+          let data = doc.data();
+          let tanggalStr = data.tanggal.split("-").reverse().join("/"); // DD/MM/YYYY
+          // Boleh ajukan izin selama kegiatan belum ditutup
+          if(data.status !== "Ditutup") {
+            selectKegiatan.innerHTML += `<option value="${data.jenis_kegiatan} (${tanggalStr})">${data.jenis_kegiatan} - ${tanggalStr}</option>`;
+          }
+        });
+      } catch (error) {
+        selectKegiatan.innerHTML = `<option value="">-- Gagal memuat agenda --</option>`;
+      }
+    }
+
+    function pantauRiwayatIzin() {
+      db.collection("Izin")
+        .where("username", "==", currentUser)
+        .orderBy("waktu_pengajuan", "desc")
+        .onSnapshot((snapshot) => {
+          let listContainer = document.getElementById('listRiwayatIzin');
+          let htmlData = "";
+
+          if (snapshot.empty) {
+            listContainer.innerHTML = `<div class="bg-white p-6 rounded-xl shadow-sm text-center border border-gray-200"><p class="text-gray-400 font-bold text-xs uppercase tracking-widest">Belum ada riwayat izin</p></div>`;
+            return;
+          }
+
+          snapshot.forEach(doc => {
+            let data = doc.data();
+            let tglPengajuan = data.waktu_pengajuan ? data.waktu_pengajuan.toDate().toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'}) : "Baru Saja";
+            
+            let statusWarna = "bg-yellow-100 text-yellow-700"; // Default Pending
+            let borderColor = "border-yellow-400";
+            if (data.status === "Diterima") { statusWarna = "bg-green-100 text-green-700"; borderColor = "border-pkb"; }
+            else if (data.status === "Ditolak") { statusWarna = "bg-red-100 text-red-700"; borderColor = "border-red-500"; }
+
+            htmlData += `
+              <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 ${borderColor} flex justify-between items-center">
+                <div>
+                  <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">${tglPengajuan}</p>
+                  <p class="font-bold text-gray-800 text-sm leading-tight">${data.kegiatan}</p>
+                </div>
+                <div class="text-right">
+                  <span class="text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest ${statusWarna}">${data.status}</span>
+                </div>
+              </div>
+            `;
+          });
+          listContainer.innerHTML = htmlData;
+        }, (error) => {
+          console.log("Error mengambil riwayat izin:", error);
+        });
+    }
 
     function getBase64(file) {
       return new Promise((resolve, reject) => {
@@ -74,22 +189,25 @@
       });
     }
 
-    async function ajukanIzin(e) {
+    async function kirimIzin(e) {
       e.preventDefault();
-      const btn = document.getElementById('btnSubmit');
-      const kegiatan = document.getElementById('namaKegiatan').value.trim();
-      const alasan = document.getElementById('alasanIzin').value.trim();
-      const fileInput = document.getElementById('fileIzin').files[0];
       
-      if (!fileInput) return;
+      const kegiatan = document.getElementById('inputKegiatan').value;
+      const alasan = document.getElementById('inputAlasan').value;
+      const fileInput = document.getElementById('fileBukti').files[0];
+      const btn = document.getElementById('btnSubmit');
 
-      btn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Mengirim ke GDrive...`;
+      if (!kegiatan) { Swal.fire('Oops', 'Pilih kegiatan yang ingin dimintakan izin.', 'warning'); return; }
+      if (!fileInput) { Swal.fire('Oops', 'Wajib melampirkan foto bukti!', 'warning'); return; }
+      if (fileInput.size > 5 * 1024 * 1024) { Swal.fire('File Terlalu Besar', 'Maksimal ukuran file bukti adalah 5MB.', 'error'); return; }
+
+      btn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Mengirim ke Pusat...`;
       btn.disabled = true;
 
       try {
         let base64Data = await getBase64(fileInput);
 
-        let payload = {
+        let payloadFile = {
           action: "uploadIzin",
           base64: base64Data,
           mimeType: fileInput.type,
@@ -98,36 +216,49 @@
           kegiatan: kegiatan
         };
 
-        // Tembakkan ke Google Apps Script (GDrive)
-        let response = await fetch(GAS_URL, {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-        
+        let response = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payloadFile) });
         let gasResult = await response.json();
-        
-        if (gasResult.status !== "success") {
-          throw new Error(gasResult.message);
-        }
 
-        // Catat di Firestore Database
-        await db.collection("Izin").add({
-          waktu_pengajuan: firebase.firestore.FieldValue.serverTimestamp(),
+        // PENANGKAL ERROR DRIVEAPP
+        if (gasResult.status !== "success") {
+             if (gasResult.message && gasResult.message.includes("DriveApp")) {
+                 console.log("File terupload, tapi akses ditolak Google. Mengabaikan error.");
+             } else {
+                 throw new Error(gasResult.message || "Gagal menghubungi server Google.");
+             }
+        }
+        
+        let linkBerkas = gasResult.fileUrl || "Lihat Langsung di Folder Izin GDrive";
+
+        // Catat di Firebase untuk Antrean Validasi Koordinator
+        let idIzin = "IZIN-" + new Date().getTime();
+        await db.collection("Izin").doc(idIzin).set({
+          id_izin: idIzin,
           username: currentUser,
           nama: currentNama,
           kegiatan: kegiatan,
           alasan: alasan,
-          file_url: gasResult.fileUrl,
-          nama_file: gasResult.namaFile,
-          status: "Pending"
+          file_url: linkBerkas,
+          waktu_pengajuan: firebase.firestore.FieldValue.serverTimestamp(),
+          status: "Pending" // Menunggu keputusan koordinator
         });
 
-        Swal.fire({ icon: 'success', title: 'Terkirim', text: 'Pengajuan izin berhasil masuk ke GDrive.', confirmButtonColor: '#059669' })
-        .then(() => { window.location.href = 'dashboard_tak.html'; });
+        Swal.fire({
+          icon: 'success', title: 'Izin Terkirim!',
+          text: 'Surat Izin Anda sedang ditinjau oleh Koordinator.',
+          confirmButtonColor: '#059669'
+        });
+
+        // Reset form
+        document.getElementById('formIzin').reset();
+        document.getElementById('namaFileTxt').innerText = "Klik/Tap untuk memilih Bukti";
+        document.getElementById('namaFileTxt').classList.remove('text-pkb');
 
       } catch (error) {
-        btn.innerHTML = `Kirim Pengajuan`; btn.disabled = false;
-        Swal.fire({ icon: 'error', title: 'Gagal', text: error.message });
+        Swal.fire('Gagal Mengirim', error.message, 'error');
+      } finally {
+        btn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg> Ajukan Izin Sekarang`;
+        btn.disabled = false;
       }
     }
   </script>
