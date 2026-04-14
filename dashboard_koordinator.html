@@ -48,7 +48,7 @@
           <select id="inputJenis" required onchange="cekJenisKegiatan()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none text-sm bg-gray-50 font-semibold text-gray-700">
             <option value="">-- Pilih Jenis --</option>
             <option value="Rapat Rutin">Rapat Rutin (Semua TAK)</option>
-            <option value="Piket Rutin">Piket Rutin (Target Khusus)</option>
+            <option value="Piket Rutin">Piket Rutin Jaga (Pilih Dewan)</option>
             <option value="Upgrading Kapasitas Diri">Upgrading Kapasitas Diri</option>
             <option value="Lainnya">Kegiatan Lainnya...</option>
           </select>
@@ -60,20 +60,11 @@
         </div>
 
         <div id="boxTargetPeserta" class="hidden mt-2">
-          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase text-red-500">Pilih Petugas Piket (Wajib Hadir)</label>
-          <p class="text-[10px] text-gray-400 mb-2 leading-tight">Hanya nama yang dicentang yang akan dirazia mesin pendisiplin. Sisanya aman.</p>
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase text-red-500">Pilih Dewan yang Bertugas</label>
+          <p class="text-[10px] text-gray-400 mb-2 leading-tight">TAK pendamping Dewan yang dicentang wajib hadir. Yang tidak dicentang bebas dari razia poin.</p>
           <div id="listCheckboxTAK" class="max-h-40 overflow-y-auto border-2 border-gray-200 rounded-lg p-2 bg-gray-50 text-sm space-y-1">
-             <div class="text-center text-xs text-gray-400 py-2">Memuat data anggota...</div>
+             <div class="text-center text-xs text-gray-400 py-2">Memuat data Dewan...</div>
           </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Batas Keterlambatan</label>
-          <select id="inputToleransi" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none text-sm bg-gray-50 font-semibold text-red-600">
-            <option value="15">15 Menit (-2 Poin / 15mnt berikutnya)</option>
-            <option value="30">30 Menit (-2 Poin / 15mnt berikutnya)</option>
-            <option value="60">1 Jam (-2 Poin / 15mnt berikutnya)</option>
-          </select>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -187,9 +178,7 @@
       let todayFormat = new Date().toLocaleDateString('en-CA'); 
       document.getElementById("inputTanggal").setAttribute("min", todayFormat);
 
-      // Panggil daftar TAK ke Checkbox
-      muatDaftarTAK();
-
+      muatDaftarDewan();
       jalankanMesinKedisiplinan();
 
       try {
@@ -205,32 +194,38 @@
       }
     });
 
-    // FITUR BARU: MUAT DAFTAR ANGGOTA KE CHECKBOX
-    async function muatDaftarTAK() {
+    // MENGAMBIL NAMA DEWAN YANG UNIK
+    async function muatDaftarDewan() {
       try {
         let uSnap = await db.collection("Users").get();
-        let cbHTML = "";
+        let dewanList = [];
         uSnap.forEach(doc => {
           let r = doc.data().role.toLowerCase();
-          if(!r.includes('koordinator') && !r.includes('bendahara')){
-             cbHTML += `
-               <label class="flex items-center gap-2 p-1 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-0">
-                 <input type="checkbox" name="target_tak" value="${doc.id}" class="w-4 h-4 text-pkb rounded focus:ring-pkb"> 
-                 <span class="text-gray-700 text-sm font-medium">${doc.data().nama}</span>
-               </label>`;
+          let d = doc.data().dewan;
+          if(!r.includes('koordinator') && !r.includes('bendahara') && d) {
+             if(!dewanList.includes(d)) { dewanList.push(d); }
           }
         });
-        document.getElementById("listCheckboxTAK").innerHTML = cbHTML || "<p class='text-xs text-gray-500'>Tidak ada data TAK.</p>";
+        
+        dewanList.sort();
+
+        let cbHTML = "";
+        dewanList.forEach(dewan => {
+           cbHTML += `
+             <label class="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-0">
+               <input type="checkbox" name="target_dewan" value="${dewan}" class="w-4 h-4 text-pkb rounded focus:ring-pkb"> 
+               <span class="text-gray-700 text-sm font-bold">Bpk/Ibu ${dewan}</span>
+             </label>`;
+        });
+        document.getElementById("listCheckboxTAK").innerHTML = cbHTML || "<p class='text-xs text-gray-500'>Tidak ada data Dewan.</p>";
       } catch(e) {
-        document.getElementById("listCheckboxTAK").innerHTML = "<p class='text-xs text-red-500'>Gagal memuat data.</p>";
+        document.getElementById("listCheckboxTAK").innerHTML = "<p class='text-xs text-red-500'>Gagal memuat data Dewan.</p>";
       }
     }
 
-    // UPDATE FUNGSI CEK JENIS
     function cekJenisKegiatan() {
       let val = document.getElementById('inputJenis').value;
       
-      // Cek apakah jenis lainnya
       if (val === "Lainnya") {
         document.getElementById('boxLainnya').classList.remove('hidden');
         document.getElementById('inputManual').required = true;
@@ -240,19 +235,15 @@
         document.getElementById('inputManual').value = "";
       }
 
-      // Cek apakah Piket Rutin (Buka Kotak Target Peserta)
       if (val === "Piket Rutin") {
         document.getElementById('boxTargetPeserta').classList.remove('hidden');
       } else {
         document.getElementById('boxTargetPeserta').classList.add('hidden');
-        // Uncheck semua box jika bukan Piket Rutin
-        document.querySelectorAll('input[name="target_tak"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="target_dewan"]').forEach(cb => cb.checked = false);
       }
     }
 
-    // =====================================================================
-    // UPDATE MESIN PENDISIPLIN (HANYA MENGHUKUM TARGET PESERTA)
-    // =====================================================================
+    // MESIN PENDISIPLIN (Target berdasarkan Nama Dewan)
     async function jalankanMesinKedisiplinan() {
       const todayStr = new Date().toLocaleDateString('en-CA'); 
       const cronRef = db.collection("Sistem").doc("CronJob");
@@ -264,13 +255,14 @@
             return; 
         }
 
-        console.log("Mesin Disiplin: Melakukan razia kedisiplinan...");
-
         let usersSnap = await db.collection("Users").get();
         let usersData = {};
         usersSnap.forEach(doc => {
           if(!doc.data().role.toLowerCase().includes('koordinator') && !doc.data().role.toLowerCase().includes('bendahara')){
-             usersData[doc.id] = doc.data().poin || 0;
+             usersData[doc.id] = {
+               poin: doc.data().poin || 0,
+               dewan: doc.data().dewan || ""
+             };
           }
         });
 
@@ -293,20 +285,18 @@
             let izinUsers = [];
             izinSnap.forEach(i => izinUsers.push(i.data().username));
 
-            // MESIN KINI LEBIH PINTAR: Cek siapa saja yang wajib dirazia
-            let targetPesertaArray = keg.target_peserta || "ALL";
+            let targetDewanArray = keg.target_peserta || "ALL";
             let userListToPenalize = [];
             
-            if (targetPesertaArray === "ALL") {
-                 userListToPenalize = Object.keys(usersData); // Semua TAK kena razia
-            } else if (Array.isArray(targetPesertaArray)) {
-                 userListToPenalize = targetPesertaArray; // Hanya petugas piket yang kena razia
+            for (let uid in usersData) {
+                let userDewan = usersData[uid].dewan;
+                if (targetDewanArray === "ALL" || (Array.isArray(targetDewanArray) && targetDewanArray.includes(userDewan))) {
+                     userListToPenalize.push(uid);
+                }
             }
 
             for (let i = 0; i < userListToPenalize.length; i++) {
                 let uid = userListToPenalize[i];
-                if (usersData[uid] === undefined) continue; // Hindari error jika uid tidak ada
-
                 if (!hadirUsers.includes(uid)) {
                     if (izinUsers.includes(uid)) {
                         console.log(`${uid} punya izin sah. Bebas Denda.`);
@@ -324,7 +314,7 @@
         }
 
         for (let uid in pointUpdates) {
-            let poinBaru = usersData[uid] + pointUpdates[uid];
+            let poinBaru = usersData[uid].poin + pointUpdates[uid];
             batch.update(db.collection("Users").doc(uid), { poin: poinBaru });
         }
 
@@ -343,7 +333,6 @@
         console.log("Mesin Disiplin Error:", err);
       }
     }
-    // =====================================================================
 
     function tampilkanQR(id, jenis, status = "Aktif") {
       activeKegiatanId = id;
@@ -377,17 +366,16 @@
       
       let tanggal = document.getElementById('inputTanggal').value;
       let jam = document.getElementById('inputJam').value;
-      let toleransi = document.getElementById('inputToleransi').value + " Menit";
+      let toleransi = "15 Menit"; // HARDCODE: Otomatis dipakemkan 15 Menit
       
-      // UPDATE: Kumpulkan Data Target (Jika Piket)
       let target_peserta = "ALL";
       if (jenis === "Piket Rutin") {
-         let selected = Array.from(document.querySelectorAll('input[name="target_tak"]:checked')).map(cb => cb.value);
+         let selected = Array.from(document.querySelectorAll('input[name="target_dewan"]:checked')).map(cb => cb.value);
          if (selected.length === 0) {
-            Swal.fire('Peringatan', 'Anda harus mencentang minimal 1 orang Petugas Piket!', 'warning');
+            Swal.fire('Peringatan', 'Anda harus mencentang minimal 1 Dewan yang piket!', 'warning');
             return;
          }
-         target_peserta = selected; // Simpan dalam bentuk Array [user1, user2]
+         target_peserta = selected; 
       }
 
       let tglDipilih = new Date(tanggal);
@@ -414,14 +402,13 @@
           tanggal: tanggal,
           jam_mulai: jam,
           toleransi: toleransi,
-          target_peserta: target_peserta, // Simpan target ke database
+          target_peserta: target_peserta,
           dibuat_oleh: currentUser,
           status: "Aktif", 
           alpa_checked: false, 
           waktu_dibuat: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Rubah Array jadi teks untuk dikirim ke GSheet
         let targetStr = Array.isArray(target_peserta) ? target_peserta.join(", ") : "ALL";
         let payload = { action: "buatJadwal", idKegiatan: idKegiatan, jenisKegiatan: jenis, tanggal: tanggal, jam: jam, toleransi: toleransi, targetPeserta: targetStr };
 
@@ -437,7 +424,7 @@
         
         Swal.fire({
           icon: 'success', title: 'Jadwal Siap!',
-          text: 'QR Code kegiatan sudah aktif dan tersimpan di database.',
+          text: 'QR Code kegiatan sudah aktif. Toleransi otomatis diset 15 Menit.',
           confirmButtonColor: '#059669', timer: 2000
         });
 
