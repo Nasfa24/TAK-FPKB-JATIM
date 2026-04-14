@@ -45,10 +45,10 @@
       <form id="formJadwal" onsubmit="buatJadwalQR(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Jenis Kegiatan</label>
-          <select id="inputJenis" required onchange="cekLainnya()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none text-sm bg-gray-50 font-semibold text-gray-700">
+          <select id="inputJenis" required onchange="cekJenisKegiatan()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none text-sm bg-gray-50 font-semibold text-gray-700">
             <option value="">-- Pilih Jenis --</option>
-            <option value="Rapat Rutin">Rapat Rutin</option>
-            <option value="Piket Rutin">Piket Rutin</option>
+            <option value="Rapat Rutin">Rapat Rutin (Semua TAK)</option>
+            <option value="Piket Rutin">Piket Rutin (Target Khusus)</option>
             <option value="Upgrading Kapasitas Diri">Upgrading Kapasitas Diri</option>
             <option value="Lainnya">Kegiatan Lainnya...</option>
           </select>
@@ -57,6 +57,23 @@
         <div id="boxLainnya" class="hidden">
           <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Sebutkan Nama Kegiatan</label>
           <input type="text" id="inputManual" placeholder="Ketik nama kegiatan di sini..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none text-sm">
+        </div>
+
+        <div id="boxTargetPeserta" class="hidden mt-2">
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase text-red-500">Pilih Petugas Piket (Wajib Hadir)</label>
+          <p class="text-[10px] text-gray-400 mb-2 leading-tight">Hanya nama yang dicentang yang akan dirazia mesin pendisiplin. Sisanya aman.</p>
+          <div id="listCheckboxTAK" class="max-h-40 overflow-y-auto border-2 border-gray-200 rounded-lg p-2 bg-gray-50 text-sm space-y-1">
+             <div class="text-center text-xs text-gray-400 py-2">Memuat data anggota...</div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Batas Keterlambatan</label>
+          <select id="inputToleransi" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb outline-none text-sm bg-gray-50 font-semibold text-red-600">
+            <option value="15">15 Menit (-2 Poin / 15mnt berikutnya)</option>
+            <option value="30">30 Menit (-2 Poin / 15mnt berikutnya)</option>
+            <option value="60">1 Jam (-2 Poin / 15mnt berikutnya)</option>
+          </select>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -157,7 +174,7 @@
 
     let currentUser = localStorage.getItem('tak_username');
     let currentRole = localStorage.getItem('tak_role') || "";
-    let activeKegiatanId = ""; // Menyimpan ID kegiatan yang sedang tampil
+    let activeKegiatanId = ""; 
     
     if (!currentUser || !currentRole.toLowerCase().includes('koordinator')) {
       window.location.href = "index.html"; 
@@ -170,20 +187,163 @@
       let todayFormat = new Date().toLocaleDateString('en-CA'); 
       document.getElementById("inputTanggal").setAttribute("min", todayFormat);
 
+      // Panggil daftar TAK ke Checkbox
+      muatDaftarTAK();
+
+      jalankanMesinKedisiplinan();
+
       try {
-        // Hanya ambil yang TERAKHIR dan BUKAN yang ditutup
         let snapshot = await db.collection("Jadwal_Kegiatan").orderBy("waktu_dibuat", "desc").limit(1).get();
         if (!snapshot.empty) {
           let jadwalTerbaru = snapshot.docs[0].data();
-          
           if(jadwalTerbaru.status !== "Ditutup") {
             tampilkanQR(jadwalTerbaru.id_kegiatan, jadwalTerbaru.jenis_kegiatan, jadwalTerbaru.status);
           }
         }
       } catch (error) {
-        console.log("Belum ada riwayat kegiatan.", error);
+        console.log("Belum ada riwayat kegiatan.");
       }
     });
+
+    // FITUR BARU: MUAT DAFTAR ANGGOTA KE CHECKBOX
+    async function muatDaftarTAK() {
+      try {
+        let uSnap = await db.collection("Users").get();
+        let cbHTML = "";
+        uSnap.forEach(doc => {
+          let r = doc.data().role.toLowerCase();
+          if(!r.includes('koordinator') && !r.includes('bendahara')){
+             cbHTML += `
+               <label class="flex items-center gap-2 p-1 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-0">
+                 <input type="checkbox" name="target_tak" value="${doc.id}" class="w-4 h-4 text-pkb rounded focus:ring-pkb"> 
+                 <span class="text-gray-700 text-sm font-medium">${doc.data().nama}</span>
+               </label>`;
+          }
+        });
+        document.getElementById("listCheckboxTAK").innerHTML = cbHTML || "<p class='text-xs text-gray-500'>Tidak ada data TAK.</p>";
+      } catch(e) {
+        document.getElementById("listCheckboxTAK").innerHTML = "<p class='text-xs text-red-500'>Gagal memuat data.</p>";
+      }
+    }
+
+    // UPDATE FUNGSI CEK JENIS
+    function cekJenisKegiatan() {
+      let val = document.getElementById('inputJenis').value;
+      
+      // Cek apakah jenis lainnya
+      if (val === "Lainnya") {
+        document.getElementById('boxLainnya').classList.remove('hidden');
+        document.getElementById('inputManual').required = true;
+      } else {
+        document.getElementById('boxLainnya').classList.add('hidden');
+        document.getElementById('inputManual').required = false;
+        document.getElementById('inputManual').value = "";
+      }
+
+      // Cek apakah Piket Rutin (Buka Kotak Target Peserta)
+      if (val === "Piket Rutin") {
+        document.getElementById('boxTargetPeserta').classList.remove('hidden');
+      } else {
+        document.getElementById('boxTargetPeserta').classList.add('hidden');
+        // Uncheck semua box jika bukan Piket Rutin
+        document.querySelectorAll('input[name="target_tak"]').forEach(cb => cb.checked = false);
+      }
+    }
+
+    // =====================================================================
+    // UPDATE MESIN PENDISIPLIN (HANYA MENGHUKUM TARGET PESERTA)
+    // =====================================================================
+    async function jalankanMesinKedisiplinan() {
+      const todayStr = new Date().toLocaleDateString('en-CA'); 
+      const cronRef = db.collection("Sistem").doc("CronJob");
+      
+      try {
+        let cronDoc = await cronRef.get();
+        if (cronDoc.exists && cronDoc.data().last_run === todayStr) {
+            console.log("Mesin Disiplin: Sudah berjalan hari ini. Aman.");
+            return; 
+        }
+
+        console.log("Mesin Disiplin: Melakukan razia kedisiplinan...");
+
+        let usersSnap = await db.collection("Users").get();
+        let usersData = {};
+        usersSnap.forEach(doc => {
+          if(!doc.data().role.toLowerCase().includes('koordinator') && !doc.data().role.toLowerCase().includes('bendahara')){
+             usersData[doc.id] = doc.data().poin || 0;
+          }
+        });
+
+        let batch = db.batch();
+        let pointUpdates = {}; 
+
+        let jadwalSnap = await db.collection("Jadwal_Kegiatan")
+            .where("status", "==", "Ditutup")
+            .where("alpa_checked", "==", false)
+            .get();
+
+        for (let doc of jadwalSnap.docs) {
+            let keg = doc.data();
+            
+            let absenSnap = await db.collection("Absensi").where("id_kegiatan", "==", keg.id_kegiatan).get();
+            let hadirUsers = [];
+            absenSnap.forEach(a => hadirUsers.push(a.data().username));
+
+            let izinSnap = await db.collection("Izin").where("kegiatan", "==", keg.jenis_kegiatan).where("status", "==", "Diterima").get();
+            let izinUsers = [];
+            izinSnap.forEach(i => izinUsers.push(i.data().username));
+
+            // MESIN KINI LEBIH PINTAR: Cek siapa saja yang wajib dirazia
+            let targetPesertaArray = keg.target_peserta || "ALL";
+            let userListToPenalize = [];
+            
+            if (targetPesertaArray === "ALL") {
+                 userListToPenalize = Object.keys(usersData); // Semua TAK kena razia
+            } else if (Array.isArray(targetPesertaArray)) {
+                 userListToPenalize = targetPesertaArray; // Hanya petugas piket yang kena razia
+            }
+
+            for (let i = 0; i < userListToPenalize.length; i++) {
+                let uid = userListToPenalize[i];
+                if (usersData[uid] === undefined) continue; // Hindari error jika uid tidak ada
+
+                if (!hadirUsers.includes(uid)) {
+                    if (izinUsers.includes(uid)) {
+                        console.log(`${uid} punya izin sah. Bebas Denda.`);
+                    } else {
+                        pointUpdates[uid] = (pointUpdates[uid] || 0) - 30;
+                        let logRef = db.collection("Log_Penalti").doc();
+                        batch.set(logRef, {
+                            username: uid, jenis: "ALPA", keterangan: `Tidak hadir pada: ${keg.jenis_kegiatan}`,
+                            poin_dipotong: -30, waktu: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                }
+            }
+            batch.update(db.collection("Jadwal_Kegiatan").doc(doc.id), { alpa_checked: true });
+        }
+
+        for (let uid in pointUpdates) {
+            let poinBaru = usersData[uid] + pointUpdates[uid];
+            batch.update(db.collection("Users").doc(uid), { poin: poinBaru });
+        }
+
+        batch.set(cronRef, { last_run: todayStr }, { merge: true });
+        await batch.commit();
+        
+        if(Object.keys(pointUpdates).length > 0) {
+          Swal.fire({
+            toast: true, position: 'top-end', icon: 'info',
+            title: 'Razia Kedisiplinan Selesai', text: 'Poin TAK yang mangkir telah dipotong otomatis.',
+            showConfirmButton: false, timer: 4000
+          });
+        }
+
+      } catch (err) {
+        console.log("Mesin Disiplin Error:", err);
+      }
+    }
+    // =====================================================================
 
     function tampilkanQR(id, jenis, status = "Aktif") {
       activeKegiatanId = id;
@@ -209,18 +369,6 @@
       document.getElementById('areaQR').classList.add('flex');
     }
 
-    function cekLainnya() {
-      let val = document.getElementById('inputJenis').value;
-      if (val === "Lainnya") {
-        document.getElementById('boxLainnya').classList.remove('hidden');
-        document.getElementById('inputManual').required = true;
-      } else {
-        document.getElementById('boxLainnya').classList.add('hidden');
-        document.getElementById('inputManual').required = false;
-        document.getElementById('inputManual').value = "";
-      }
-    }
-
     async function buatJadwalQR(e) {
       e.preventDefault();
       
@@ -229,7 +377,19 @@
       
       let tanggal = document.getElementById('inputTanggal').value;
       let jam = document.getElementById('inputJam').value;
+      let toleransi = document.getElementById('inputToleransi').value + " Menit";
       
+      // UPDATE: Kumpulkan Data Target (Jika Piket)
+      let target_peserta = "ALL";
+      if (jenis === "Piket Rutin") {
+         let selected = Array.from(document.querySelectorAll('input[name="target_tak"]:checked')).map(cb => cb.value);
+         if (selected.length === 0) {
+            Swal.fire('Peringatan', 'Anda harus mencentang minimal 1 orang Petugas Piket!', 'warning');
+            return;
+         }
+         target_peserta = selected; // Simpan dalam bentuk Array [user1, user2]
+      }
+
       let tglDipilih = new Date(tanggal);
       let hariIni = new Date();
       hariIni.setHours(0,0,0,0); 
@@ -239,7 +399,6 @@
         return;
       }
 
-      let toleransi = "15 Menit"; 
       let tglPecah = tanggal.split("-"); 
       let kodeUnik = Math.floor(Math.random() * 900) + 100;
       let idKegiatan = `KEG-${tglPecah[2]}${tglPecah[1]}-${kodeUnik}`; 
@@ -255,19 +414,23 @@
           tanggal: tanggal,
           jam_mulai: jam,
           toleransi: toleransi,
+          target_peserta: target_peserta, // Simpan target ke database
           dibuat_oleh: currentUser,
-          status: "Aktif", // Status default
+          status: "Aktif", 
+          alpa_checked: false, 
           waktu_dibuat: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        let payload = { action: "buatJadwal", idKegiatan: idKegiatan, jenisKegiatan: jenis, tanggal: tanggal, jam: jam, toleransi: toleransi };
+        // Rubah Array jadi teks untuk dikirim ke GSheet
+        let targetStr = Array.isArray(target_peserta) ? target_peserta.join(", ") : "ALL";
+        let payload = { action: "buatJadwal", idKegiatan: idKegiatan, jenisKegiatan: jenis, tanggal: tanggal, jam: jam, toleransi: toleransi, targetPeserta: targetStr };
 
-        fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
-        .catch(err => console.log("GSheets Backup error: ", err)); 
+        fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) }).catch(e => console.log(e)); 
 
         tampilkanQR(idKegiatan, jenis, "Aktif");
         document.getElementById('formJadwal').reset();
         document.getElementById('boxLainnya').classList.add('hidden');
+        document.getElementById('boxTargetPeserta').classList.add('hidden');
         
         btn.innerHTML = `Buat & Munculkan QR`;
         btn.disabled = false;
@@ -284,15 +447,12 @@
       }
     }
 
-    // ===============================================
-    // FUNGSI KENDALI BARCODE (TUNDA & TUTUP ACARA)
-    // ===============================================
     function ubahStatusKegiatan(statusBaru) {
       if(!activeKegiatanId) return;
 
       let config = statusBaru === 'Ditunda' ? 
         { title: 'Tunda Acara?', text: 'Barcode akan diburamkan sementara.', icon: 'warning', confirmButtonColor: '#eab308' } :
-        { title: 'Tutup Acara?', text: 'Barcode akan dihilangkan permanen dari layar utama.', icon: 'error', confirmButtonColor: '#ef4444' };
+        { title: 'Tutup Acara?', text: 'Mesin akan otomatis memotong -30 Poin bagi target peserta yang tidak hadir tanpa izin.', icon: 'error', confirmButtonColor: '#ef4444' };
 
       Swal.fire({
         ...config,
@@ -309,8 +469,8 @@
               document.getElementById('areaQR').classList.remove('flex');
               activeKegiatanId = "";
               Swal.fire('Ditutup!', 'Kegiatan selesai. Barcode telah dihilangkan.', 'success');
+              setTimeout(() => jalankanMesinKedisiplinan(), 2000); 
             } else {
-              // Jika ditunda, cukup panggil fungsi tampilkanQR lagi untuk update UI
               let jenis = document.getElementById('labelKegiatan').innerText.split(" (")[0];
               tampilkanQR(activeKegiatanId, jenis, "Ditunda");
               Swal.fire('Ditunda', 'Kegiatan ditunda. Barcode diburamkan.', 'success');
