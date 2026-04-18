@@ -62,9 +62,17 @@
         <div id="boxTargetPeserta" class="hidden mt-2">
           <label class="block text-xs font-bold text-gray-500 mb-1 uppercase text-red-500">Pilih Dewan yang Bertugas</label>
           <p class="text-[10px] text-gray-400 mb-2 leading-tight">TAK pendamping Dewan yang dicentang wajib hadir. Yang tidak dicentang bebas dari razia poin.</p>
+          
+          <input type="text" id="cariDewan" onkeyup="filterDewan()" placeholder="🔍 Cari nama Dewan..." class="w-full px-3 py-2 mb-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-pkb outline-none text-xs font-semibold bg-blue-50">
+
           <div id="listCheckboxTAK" class="max-h-40 overflow-y-auto border-2 border-gray-200 rounded-lg p-2 bg-gray-50 text-sm space-y-1">
              <div class="text-center text-xs text-gray-400 py-2">Memuat data Dewan...</div>
           </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Batas Keterlambatan</label>
+          <input type="text" value="Mutlak 15 Menit (-2 Poin / 15mnt)" disabled class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-sm font-bold text-red-500 cursor-not-allowed">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -100,7 +108,7 @@
         <p id="labelKegiatan" class="text-sm font-bold text-pkb mt-3 tracking-widest uppercase text-center bg-green-50 px-3 py-1 rounded-md w-full"></p>
         
         <div class="grid grid-cols-2 gap-3 mt-4 w-full">
-          <button onclick="ubahStatusKegiatan('Ditunda')" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2.5 rounded-lg transition shadow-sm text-xs flex items-center justify-center gap-1">
+          <button id="btnTundaLanjut" onclick="ubahStatusKegiatan('Ditunda')" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2.5 rounded-lg transition shadow-sm text-xs flex items-center justify-center gap-1">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 011.789 1.106l1.5 3M15 10h5.236a2 2 0 011.789 2.894l-3.5 7A2 2 0 0116.736 21H12"></path></svg> TUNDA
           </button>
           <button onclick="ubahStatusKegiatan('Ditutup')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2.5 rounded-lg transition shadow-sm text-xs flex items-center justify-center gap-1">
@@ -109,7 +117,7 @@
         </div>
 
         <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg mt-4 w-full">
-          <p class="text-xs text-blue-800 font-semibold text-center"><span class="font-bold">Info:</span> Gunakan tombol Tunda jika acara molor, atau Tutup jika acara telah selesai.</p>
+          <p class="text-xs text-blue-800 font-semibold text-center"><span class="font-bold">Info:</span> Gunakan tombol Tunda jika acara molor sementara, Lanjutkan untuk mengaktifkan kembali, atau Tutup jika acara selesai.</p>
         </div>
       </div>
 
@@ -194,7 +202,6 @@
       }
     });
 
-    // MENGAMBIL NAMA DEWAN YANG UNIK
     async function muatDaftarDewan() {
       try {
         let uSnap = await db.collection("Users").get();
@@ -212,7 +219,7 @@
         let cbHTML = "";
         dewanList.forEach(dewan => {
            cbHTML += `
-             <label class="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-0">
+             <label class="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-0 dewan-item">
                <input type="checkbox" name="target_dewan" value="${dewan}" class="w-4 h-4 text-pkb rounded focus:ring-pkb"> 
                <span class="text-gray-700 text-sm font-bold">Bpk/Ibu ${dewan}</span>
              </label>`;
@@ -220,6 +227,21 @@
         document.getElementById("listCheckboxTAK").innerHTML = cbHTML || "<p class='text-xs text-gray-500'>Tidak ada data Dewan.</p>";
       } catch(e) {
         document.getElementById("listCheckboxTAK").innerHTML = "<p class='text-xs text-red-500'>Gagal memuat data Dewan.</p>";
+      }
+    }
+
+    // FITUR BARU: CARI NAMA DEWAN
+    function filterDewan() {
+      let input = document.getElementById('cariDewan').value.toLowerCase();
+      let labels = document.getElementById('listCheckboxTAK').getElementsByClassName('dewan-item');
+      
+      for (let i = 0; i < labels.length; i++) {
+        let text = labels[i].innerText.toLowerCase();
+        if (text.includes(input)) {
+          labels[i].style.display = "flex";
+        } else {
+          labels[i].style.display = "none";
+        }
       }
     }
 
@@ -240,10 +262,11 @@
       } else {
         document.getElementById('boxTargetPeserta').classList.add('hidden');
         document.querySelectorAll('input[name="target_dewan"]').forEach(cb => cb.checked = false);
+        document.getElementById('cariDewan').value = ""; // Reset pencarian
+        filterDewan();
       }
     }
 
-    // MESIN PENDISIPLIN (Target berdasarkan Nama Dewan)
     async function jalankanMesinKedisiplinan() {
       const todayStr = new Date().toLocaleDateString('en-CA'); 
       const cronRef = db.collection("Sistem").doc("CronJob");
@@ -341,17 +364,29 @@
       
       let badge = document.getElementById('badgeStatusKegiatan');
       let overlay = document.getElementById('overlayTunda');
+      let btnTundaLanjut = document.getElementById('btnTundaLanjut');
 
       if(status === "Ditunda") {
         badge.className = "text-[10px] font-bold px-2 py-1 rounded bg-yellow-100 text-yellow-600";
         badge.innerText = "DITUNDA";
         overlay.classList.remove('hidden');
         document.getElementById('qrBoxWrapper').classList.replace('border-pkb', 'border-yellow-500');
+        
+        // UPDATE: Ubah tombol jadi Lanjutkan
+        btnTundaLanjut.setAttribute('onclick', "ubahStatusKegiatan('Aktif')");
+        btnTundaLanjut.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> LANJUTKAN`;
+        btnTundaLanjut.className = "bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 rounded-lg transition shadow-sm text-xs flex items-center justify-center gap-1";
+
       } else {
         badge.className = "text-[10px] font-bold px-2 py-1 rounded bg-green-100 text-green-600";
         badge.innerText = "AKTIF";
         overlay.classList.add('hidden');
         document.getElementById('qrBoxWrapper').classList.replace('border-yellow-500', 'border-pkb');
+
+        // Kembalikan ke tombol Tunda
+        btnTundaLanjut.setAttribute('onclick', "ubahStatusKegiatan('Ditunda')");
+        btnTundaLanjut.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 011.789 1.106l1.5 3M15 10h5.236a2 2 0 011.789 2.894l-3.5 7A2 2 0 0116.736 21H12"></path></svg> TUNDA`;
+        btnTundaLanjut.className = "bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2.5 rounded-lg transition shadow-sm text-xs flex items-center justify-center gap-1";
       }
       
       document.getElementById('areaQR').classList.remove('hidden');
@@ -366,7 +401,7 @@
       
       let tanggal = document.getElementById('inputTanggal').value;
       let jam = document.getElementById('inputJam').value;
-      let toleransi = "15 Menit"; // HARDCODE: Otomatis dipakemkan 15 Menit
+      let toleransi = "15 Menit"; 
       
       let target_peserta = "ALL";
       if (jenis === "Piket Rutin") {
@@ -424,7 +459,7 @@
         
         Swal.fire({
           icon: 'success', title: 'Jadwal Siap!',
-          text: 'QR Code kegiatan sudah aktif. Toleransi otomatis diset 15 Menit.',
+          text: 'QR Code kegiatan sudah aktif. Toleransi mutlak 15 Menit.',
           confirmButtonColor: '#059669', timer: 2000
         });
 
@@ -437,9 +472,14 @@
     function ubahStatusKegiatan(statusBaru) {
       if(!activeKegiatanId) return;
 
-      let config = statusBaru === 'Ditunda' ? 
-        { title: 'Tunda Acara?', text: 'Barcode akan diburamkan sementara.', icon: 'warning', confirmButtonColor: '#eab308' } :
-        { title: 'Tutup Acara?', text: 'Mesin akan otomatis memotong -30 Poin bagi target peserta yang tidak hadir tanpa izin.', icon: 'error', confirmButtonColor: '#ef4444' };
+      let config;
+      if (statusBaru === 'Ditunda') {
+        config = { title: 'Tunda Acara?', text: 'Barcode akan diburamkan sementara.', icon: 'warning', confirmButtonColor: '#eab308' };
+      } else if (statusBaru === 'Aktif') {
+        config = { title: 'Lanjutkan Acara?', text: 'Barcode akan diaktifkan kembali.', icon: 'info', confirmButtonColor: '#059669' };
+      } else {
+        config = { title: 'Tutup Acara?', text: 'Mesin akan otomatis memotong poin bagi target peserta yang mangkir.', icon: 'error', confirmButtonColor: '#ef4444' };
+      }
 
       Swal.fire({
         ...config,
@@ -457,10 +497,14 @@
               activeKegiatanId = "";
               Swal.fire('Ditutup!', 'Kegiatan selesai. Barcode telah dihilangkan.', 'success');
               setTimeout(() => jalankanMesinKedisiplinan(), 2000); 
-            } else {
+            } else if (statusBaru === "Ditunda") {
               let jenis = document.getElementById('labelKegiatan').innerText.split(" (")[0];
               tampilkanQR(activeKegiatanId, jenis, "Ditunda");
               Swal.fire('Ditunda', 'Kegiatan ditunda. Barcode diburamkan.', 'success');
+            } else if (statusBaru === "Aktif") {
+              let jenis = document.getElementById('labelKegiatan').innerText.split(" (")[0];
+              tampilkanQR(activeKegiatanId, jenis, "Aktif");
+              Swal.fire('Aktif', 'Kegiatan dilanjutkan. Barcode aktif kembali.', 'success');
             }
           } catch (err) {
             Swal.fire('Gagal', err.message, 'error');
