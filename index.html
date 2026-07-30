@@ -43,9 +43,7 @@
   </div>
 
   <script>
-    // INJEKSI URL DARI BACKEND GAS (Sangat Penting)
-    const GAS_WEB_APP_URL = "<?= typeof url !== 'undefined' ? url : '' ?>";
-
+    // KONFIGURASI FIREBASE MURNI (Tanpa campur tangan Google Apps Script tag)
     const firebaseConfig = {
       apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
       authDomain: "apps-tak-fpkb.firebaseapp.com",
@@ -59,20 +57,19 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // CEK SESI: Gunakan URL Parameter GAS, bukan .html
+    // CEK SESI: Direct Routing ke file HTML lokal di server Anda
     document.addEventListener("DOMContentLoaded", function() {
       let savedUser = localStorage.getItem('tak_username');
       let savedRole = localStorage.getItem('tak_role');
       
-      if (savedUser && GAS_WEB_APP_URL !== "") {
+      if (savedUser) {
         let role = (savedRole || "").toLowerCase();
-        let pageTarget = 'dashboard_tak'; 
+        let pageTarget = 'dashboard_tak.html'; 
         
-        if (role.includes('koordinator')) pageTarget = 'dashboard_koordinator';
-        else if (role.includes('bendahara')) pageTarget = 'dashboard_bendahara';
+        if (role.includes('koordinator')) pageTarget = 'dashboard_koordinator.html';
+        else if (role.includes('bendahara')) pageTarget = 'dashboard_bendahara.html';
         
-        // Pindah menggunakan arsitektur URL GAS
-        window.location.href = `${GAS_WEB_APP_URL}?page=${pageTarget}&u=${savedUser}`;
+        window.location.href = pageTarget;
       }
     });
 
@@ -104,18 +101,15 @@
 
             btn.innerHTML = `Mengalihkan...`;
             
-            // ROUTING AMAN BERBASIS GAS
+            // DIRECT ROUTING: Pindah halaman di dalam domain Anda sendiri
             let role = (userData.role || "").toString().toLowerCase();
-            let pageTarget = 'dashboard_tak'; 
+            let pageTarget = 'dashboard_tak.html'; 
             
-            if (role.includes('koordinator')) pageTarget = 'dashboard_koordinator';
-            else if (role.includes('bendahara')) pageTarget = 'dashboard_bendahara';
+            if (role.includes('koordinator')) pageTarget = 'dashboard_koordinator.html';
+            else if (role.includes('bendahara')) pageTarget = 'dashboard_bendahara.html';
             
-            if (GAS_WEB_APP_URL !== "") {
-              window.location.href = `${GAS_WEB_APP_URL}?page=${pageTarget}&u=${userData.username}`;
-            } else {
-              Swal.fire('Error', 'Sistem tidak dapat membaca URL Server.', 'error');
-            }
+            window.location.href = pageTarget;
+
           } else {
             throw new Error("Data Profil tidak ditemukan di Firestore Database.");
           }
@@ -124,11 +118,24 @@
           btn.innerHTML = `Masuk`; 
           btn.disabled = false;
           
-          let errorMsg = "Username atau Password salah!";
-          if (error.code === 'auth/network-request-failed') errorMsg = "Koneksi internet terputus.";
-          if (error.code === 'auth/user-not-found') errorMsg = "Akun belum terdaftar di sistem Firebase.";
+          // OBSERVABILITY TINGKAT TINGGI: Menangkap Akar Masalah Sebenarnya
+          let judulError = 'Akses Ditolak';
+          let pesanError = error.message; 
           
-          Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: errorMsg, confirmButtonColor: '#059669' });
+          if (error.code === 'auth/network-request-failed') {
+            pesanError = "Koneksi terputus ATAU Domain 'lebahindrapura.fun' belum didaftarkan di Firebase > Authentication > Settings > Authorized Domains.";
+          } else if (error.code === 'auth/user-not-found') {
+            pesanError = "Akun belum terdaftar di Firebase. Pastikan Anda sudah menjalankan fungsi 'injeksiDataKeFirebase' di Google Apps Script.";
+          } else if (error.code === 'auth/wrong-password') {
+            pesanError = "Password yang Anda masukkan salah.";
+          }
+          
+          Swal.fire({ 
+            icon: 'error', 
+            title: judulError, 
+            text: `${pesanError} (Kode Sistem: ${error.code || 'unknown'})`, 
+            confirmButtonColor: '#059669' 
+          });
         });
     }
   </script>
