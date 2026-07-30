@@ -21,7 +21,7 @@
 </head>
 <body class="bg-gray-50 flex items-center justify-center min-h-screen">
 
-  <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm mx-4 border-t-4 border-pkb">
+  <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-sm mx-4 border-t-4 border-pkb relative">
     <div class="text-center mb-8">
       <h1 class="text-2xl font-bold text-gray-800">Tenaga Ahli Kedewanan</h1>
       <p class="text-sm text-gray-500">FPKB DPRD Provinsi Jawa Timur</p>
@@ -40,10 +40,22 @@
         <span>Masuk</span>
       </button>
     </form>
+
+    <!-- UTILITY FOOTER: Refresh & Clear Cache (Self-Healing UI) -->
+    <div class="mt-6 pt-4 border-t border-gray-100 flex justify-between items-center text-xs">
+      <button type="button" onclick="window.location.reload(true)" class="text-gray-500 hover:text-pkb flex items-center transition group">
+        <svg class="w-4 h-4 mr-1 group-hover:rotate-180 transition duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+        Refresh
+      </button>
+      <button type="button" onclick="handleClearCache()" class="text-gray-500 hover:text-red-500 flex items-center transition">
+        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+        Clear Cache
+      </button>
+    </div>
   </div>
 
   <script>
-    // KONFIGURASI FIREBASE MURNI (Tanpa campur tangan Google Apps Script tag)
+    // KONFIGURASI FIREBASE MURNI
     const firebaseConfig = {
       apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
       authDomain: "apps-tak-fpkb.firebaseapp.com",
@@ -57,7 +69,7 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // CEK SESI: Direct Routing ke file HTML lokal di server Anda
+    // CEK SESI: Direct Routing
     document.addEventListener("DOMContentLoaded", function() {
       let savedUser = localStorage.getItem('tak_username');
       let savedRole = localStorage.getItem('tak_role');
@@ -73,11 +85,11 @@
       }
     });
 
+    // FUNGSI UTAMA: Login
     function handleLogin(event) {
       event.preventDefault(); 
       const btn = document.getElementById('btnSubmit');
       
-      // Sanitasi input
       const user = document.getElementById('username').value.trim().toLowerCase();
       const pass = document.getElementById('password').value.trim();
       const emailFirebase = user + "@tak.fpkb.id";
@@ -101,7 +113,6 @@
 
             btn.innerHTML = `Mengalihkan...`;
             
-            // DIRECT ROUTING: Pindah halaman di dalam domain Anda sendiri
             let role = (userData.role || "").toString().toLowerCase();
             let pageTarget = 'dashboard_tak.html'; 
             
@@ -118,7 +129,6 @@
           btn.innerHTML = `Masuk`; 
           btn.disabled = false;
           
-          // OBSERVABILITY TINGKAT TINGGI: Menangkap Akar Masalah Sebenarnya
           let judulError = 'Akses Ditolak';
           let pesanError = error.message; 
           
@@ -137,6 +147,46 @@
             confirmButtonColor: '#059669' 
           });
         });
+    }
+
+    // FUNGSI SELF-HEALING: Clear Cache & Hard Reset
+    function handleClearCache() {
+      Swal.fire({
+        title: 'Perbaiki Sistem?',
+        text: "Ini akan membersihkan data sesi yang tersangkut dan memuat ulang aplikasi ke kondisi awal.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#059669',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Ya, Bersihkan',
+        cancelButtonText: 'Batal'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          // 1. Sapu bersih seluruh local & session storage
+          localStorage.clear();
+          sessionStorage.clear();
+          
+          // 2. Paksa putus koneksi Firebase Auth (jika ada sesi hantu)
+          if (auth.currentUser) {
+            auth.signOut().then(() => executeReload());
+          } else {
+            executeReload();
+          }
+        }
+      });
+    }
+
+    function executeReload() {
+      Swal.fire({
+        title: 'Sistem Bersih!',
+        text: 'Memuat ulang halaman...',
+        icon: 'success',
+        timer: 1200,
+        showConfirmButton: false
+      }).then(() => {
+        // Hard reload memaksa browser membuang cache lama
+        window.location.reload(true);
+      });
     }
   </script>
 </body>
