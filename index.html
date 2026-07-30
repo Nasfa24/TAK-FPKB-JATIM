@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Login - TAK FPKB DPRD Jatim</title>
   <meta name="theme-color" content="#059669">
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" href="icon-192.png">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  
+  <!-- Tailwind & SweetAlert -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -30,7 +30,7 @@
     <form id="loginForm" onsubmit="handleLogin(event)">
       <div class="mb-4">
         <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-        <input type="text" id="username" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb focus:border-pkb outline-none transition">
+        <input type="text" id="username" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pkb focus:border-pkb outline-none transition" autocomplete="off">
       </div>
       <div class="mb-6">
         <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
@@ -43,6 +43,9 @@
   </div>
 
   <script>
+    // INJEKSI URL DARI BACKEND GAS (Sangat Penting)
+    const GAS_WEB_APP_URL = "<?= typeof url !== 'undefined' ? url : '' ?>";
+
     const firebaseConfig = {
       apiKey: "AIzaSyAeiiF06uIkuRJuEELSORGYriC4LZIWAzo",
       authDomain: "apps-tak-fpkb.firebaseapp.com",
@@ -52,35 +55,34 @@
       appId: "1:370368024191:web:ece099f60a9064a968394a"
     };
 
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // CEK SESI (Jika user sudah pernah login dan belum logout)
+    // CEK SESI: Gunakan URL Parameter GAS, bukan .html
     document.addEventListener("DOMContentLoaded", function() {
       let savedUser = localStorage.getItem('tak_username');
       let savedRole = localStorage.getItem('tak_role');
       
-      if (savedUser) {
+      if (savedUser && GAS_WEB_APP_URL !== "") {
         let role = (savedRole || "").toLowerCase();
-        let dest = 'dashboard_tak.html'; // Default ke TAK
+        let pageTarget = 'dashboard_tak'; 
         
-        if (role.includes('koordinator')) {
-          dest = 'dashboard_koordinator.html';
-        } else if (role.includes('bendahara')) {
-          dest = 'dashboard_bendahara.html';
-        }
+        if (role.includes('koordinator')) pageTarget = 'dashboard_koordinator';
+        else if (role.includes('bendahara')) pageTarget = 'dashboard_bendahara';
         
-        window.location.href = dest;
+        // Pindah menggunakan arsitektur URL GAS
+        window.location.href = `${GAS_WEB_APP_URL}?page=${pageTarget}&u=${savedUser}`;
       }
     });
 
     function handleLogin(event) {
       event.preventDefault(); 
       const btn = document.getElementById('btnSubmit');
-      const user = document.getElementById('username').value.trim();
-      const pass = document.getElementById('password').value.trim();
       
+      // Sanitasi input
+      const user = document.getElementById('username').value.trim().toLowerCase();
+      const pass = document.getElementById('password').value.trim();
       const emailFirebase = user + "@tak.fpkb.id";
 
       btn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Memproses...`;
@@ -102,26 +104,29 @@
 
             btn.innerHTML = `Mengalihkan...`;
             
-            // LOGIKA PENGALIHAN BERDASARKAN ROLE
+            // ROUTING AMAN BERBASIS GAS
             let role = (userData.role || "").toString().toLowerCase();
-            let dest = 'dashboard_tak.html'; // Default ke TAK
+            let pageTarget = 'dashboard_tak'; 
             
-            if (role.includes('koordinator')) {
-              dest = 'dashboard_koordinator.html';
-            } else if (role.includes('bendahara')) {
-              dest = 'dashboard_bendahara.html';
+            if (role.includes('koordinator')) pageTarget = 'dashboard_koordinator';
+            else if (role.includes('bendahara')) pageTarget = 'dashboard_bendahara';
+            
+            if (GAS_WEB_APP_URL !== "") {
+              window.location.href = `${GAS_WEB_APP_URL}?page=${pageTarget}&u=${userData.username}`;
+            } else {
+              Swal.fire('Error', 'Sistem tidak dapat membaca URL Server.', 'error');
             }
-            
-            window.location.href = dest;
-
           } else {
-            throw new Error("Data Profil tidak ditemukan di Database.");
+            throw new Error("Data Profil tidak ditemukan di Firestore Database.");
           }
         })
         .catch((error) => {
-          btn.innerHTML = `Masuk`; btn.disabled = false;
+          btn.innerHTML = `Masuk`; 
+          btn.disabled = false;
+          
           let errorMsg = "Username atau Password salah!";
           if (error.code === 'auth/network-request-failed') errorMsg = "Koneksi internet terputus.";
+          if (error.code === 'auth/user-not-found') errorMsg = "Akun belum terdaftar di sistem Firebase.";
           
           Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: errorMsg, confirmButtonColor: '#059669' });
         });
