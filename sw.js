@@ -1,12 +1,11 @@
 // sw.js - Service worker Lebah Indrapura
-const CACHE = 'lebah-indrapura-v1';
+const CACHE = 'lebah-indrapura-v2';
 const ASET = [
   './',
   './index.html',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png',
-  './guard.js'
+  './icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -20,15 +19,20 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Navigasi: jaringan dulu, cache sebagai cadangan saat offline.
-// Aset statis: cache dulu supaya cepat.
+// Navigasi, skrip, dan gaya: jaringan dulu supaya pembaruan keamanan tidak tertahan cache.
+// Gambar dan ikon: cache dulu supaya cepat.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  if (req.mode === 'navigate') {
+  const jaringanDulu = req.mode === 'navigate'
+    || req.destination === 'script'
+    || req.destination === 'style'
+    || req.destination === 'document';
+
+  if (jaringanDulu) {
     event.respondWith(
       fetch(req).then((res) => {
         const kopi = res.clone();
