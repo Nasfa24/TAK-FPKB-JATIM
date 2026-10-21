@@ -2,6 +2,9 @@
 // MESIN UTAMA - APPS TAK FPKB JATIM (MASTER SCRIPT)
 // Versi aman: setiap panggilan doPost wajib membawa token Firebase.
 // Tempel seluruh berkas ini menggantikan isi Code.gs, lalu Deploy > Kelola deployment > Edit > Versi baru.
+// Setelah tempel: Deploy > Kelola deployment > ikon pensil > Versi: New version > Deploy.
+// Catatan: fungsi injeksiDataKeFirebase akan ditolak aturan Firestore karena akun pemilik bukan @tak.fpkb.id.
+// Untuk menambah user baru, pakai Firebase Console (Authentication lalu Firestore Users), atau minta dibuatkan halaman admin.
 // ==========================================
 
 const NAMA_SHEET_USERS = "Users";
