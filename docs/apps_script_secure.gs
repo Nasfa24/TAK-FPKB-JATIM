@@ -157,6 +157,9 @@ function doPost(e) {
         }
       }
 
+      if (String(sheetJadwal.getRange(1, 6).getValue()).trim().toLowerCase() !== "target_peserta") {
+        sheetJadwal.getRange(1, 6).setValue("Target_Peserta");
+      }
       let target = payload.targetPeserta || "ALL";
       sheetJadwal.appendRow([idKegiatan, payload.jenisKegiatan, payload.tanggal, payload.jam, payload.toleransi, target]);
       return balas({ status: "success", message: "Jadwal berhasil diarsipkan ke GSheets" });
@@ -165,19 +168,25 @@ function doPost(e) {
     if (payload.action === "updateUserSheet") {
       const ss = SpreadsheetApp.getActiveSpreadsheet();
       const sheetUsers = ss.getSheetByName("Users");
+      if (!sheetUsers) { throw new Error("Sheet Users tidak ditemukan."); }
       const data = sheetUsers.getDataRange().getValues();
+      const cari = String(payload.username || "").trim();
       let rowToUpdate = -1;
       for (let i = 1; i < data.length; i++) {
-        if (data[i][0].toString().trim() === payload.username) { rowToUpdate = i + 1; break; }
+        if (data[i][0].toString().trim() === cari) { rowToUpdate = i + 1; break; }
       }
       if (rowToUpdate === -1) { throw new Error("Username tidak ditemukan di GSheets"); }
 
-      sheetUsers.getRange(rowToUpdate, 3).setValue(payload.namaLengkap);
-      sheetUsers.getRange(rowToUpdate, 4).setValue(payload.namaDewan);
-      sheetUsers.getRange(rowToUpdate, 5).setValue(payload.role);
-      sheetUsers.getRange(rowToUpdate, 6).setValue(payload.poin);
-      sheetUsers.getRange(rowToUpdate, 7).setValue(payload.noKontrak);
-      return balas({ status: "success", message: "GSheets Berhasil Diupdate" });
+      // Hanya kolom yang dikirim yang diubah. Kolom lain dibiarkan utuh.
+      const kolom = { namaLengkap: 3, namaDewan: 4, role: 5, poin: 6, noKontrak: 7 };
+      let diubah = 0;
+      for (let k in kolom) {
+        if (payload[k] !== undefined && payload[k] !== null && String(payload[k]).trim() !== "") {
+          sheetUsers.getRange(rowToUpdate, kolom[k]).setValue(payload[k]);
+          diubah++;
+        }
+      }
+      return balas({ status: "success", message: "GSheets diperbarui: " + diubah + " kolom" });
     }
 
     if (payload.action === "uploadKas") {
@@ -251,17 +260,30 @@ function doPost(e) {
         existing[bln + "_" + dataKas[i][1].toString().trim()] = true;
       }
 
-      let addedCount = 0;
+      let unik = [];
+      let sudahAda = {};
       for (let i = 0; i < listTAK.length; i++) {
-        let u = listTAK[i];
-        if (!existing[targetBulan + "_" + u]) {
-          let nextRow = sheetKas.getLastRow() + 1;
-          let formulaDenda = "=IF(ISBLANK(B" + nextRow + "), 0, IF(VLOOKUP(B" + nextRow + ", Users!A:G, 6, FALSE) < 100, (100 - VLOOKUP(B" + nextRow + ", Users!A:G, 6, FALSE)) * 500, 0))";
-          let formulaTotal = "=IF(ISBLANK(C" + nextRow + "), 0, C" + nextRow + " + D" + nextRow + ")";
-          sheetKas.appendRow([targetBulan, u, nominalDasar, formulaDenda, formulaTotal, "Belum Lunas"]);
-          addedCount++;
-        }
+        let u = String(listTAK[i] || "").trim();
+        if (!u || sudahAda[u]) { continue; }
+        sudahAda[u] = true;
+        if (existing[targetBulan + "_" + u]) { continue; }
+        unik.push(u);
       }
+
+      let addedCount = 0;
+      if (unik.length > 0) {
+        let mulai = sheetKas.getLastRow() + 1;
+        let baris = [];
+        for (let j = 0; j < unik.length; j++) {
+          let r = mulai + j;
+          let formulaDenda = "=IF(ISBLANK(B" + r + "), 0, IF(VLOOKUP(B" + r + ", Users!A:G, 6, FALSE) < 100, (100 - VLOOKUP(B" + r + ", Users!A:G, 6, FALSE)) * 500, 0))";
+          let formulaTotal = "=IF(ISBLANK(C" + r + "), 0, C" + r + " + D" + r + ")";
+          baris.push([targetBulan, unik[j], nominalDasar, formulaDenda, formulaTotal, "Belum Lunas"]);
+        }
+        sheetKas.getRange(mulai, 1, baris.length, 6).setValues(baris);
+        addedCount = baris.length;
+      }
+
       return balas({ status: "success", message: "Berhasil! " + addedCount + " Tagihan baru untuk bulan " + targetBulan + " telah dibuat otomatis di GSheets." });
     }
 
