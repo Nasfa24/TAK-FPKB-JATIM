@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Login - TAK FPKB DPRD Jatim</title>
   <meta name="theme-color" content="#059669">
+  <link rel="manifest" href="manifest.json">
   
   <!-- Tailwind & SweetAlert -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -186,6 +187,13 @@
       }).then(() => {
         // Hard reload memaksa browser membuang cache lama
         window.location.reload(true);
+      });
+    }
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (e) { console.log('Service worker gagal:', e.message); });
       });
     }
   </script>

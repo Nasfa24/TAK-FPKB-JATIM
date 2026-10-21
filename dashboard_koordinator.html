@@ -13,6 +13,7 @@
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="guard.js" data-roles="Koordinator"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 
   <script>
@@ -272,16 +273,26 @@
       const cronRef = db.collection("Sistem").doc("CronJob");
       
       try {
-        let cronDoc = await cronRef.get();
-        if (cronDoc.exists && cronDoc.data().last_run === todayStr) {
+        // Klaim tanggal secara atomik supaya dua tab tidak memotong poin dua kali.
+        let sudahJalan = false;
+        await db.runTransaction(async (tx) => {
+          let cronDoc = await tx.get(cronRef);
+          if (cronDoc.exists && cronDoc.data().last_run === todayStr) {
+            sudahJalan = true;
+            return;
+          }
+          tx.set(cronRef, { last_run: todayStr }, { merge: true });
+        });
+        if (sudahJalan) {
             console.log("Mesin Disiplin: Sudah berjalan hari ini. Aman.");
-            return; 
+            return;
         }
 
         let usersSnap = await db.collection("Users").get();
         let usersData = {};
         usersSnap.forEach(doc => {
-          if(!doc.data().role.toLowerCase().includes('koordinator') && !doc.data().role.toLowerCase().includes('bendahara')){
+          let roleTxt = String(doc.data().role || '').toLowerCase();
+          if(!roleTxt.includes('koordinator') && !roleTxt.includes('bendahara')){
              usersData[doc.id] = {
                poin: doc.data().poin || 0,
                dewan: doc.data().dewan || ""
@@ -304,9 +315,16 @@
             let hadirUsers = [];
             absenSnap.forEach(a => hadirUsers.push(a.data().username));
 
-            let izinSnap = await db.collection("Izin").where("kegiatan", "==", keg.jenis_kegiatan).where("status", "==", "Diterima").get();
+            let izinSnap = await db.collection("Izin").where("id_kegiatan", "==", keg.id_kegiatan).where("status", "==", "Diterima").get();
             let izinUsers = [];
             izinSnap.forEach(i => izinUsers.push(i.data().username));
+            if (izinUsers.length === 0) {
+                // Kompatibilitas data izin lama yang belum menyimpan id_kegiatan
+                let tglLama = String(keg.tanggal || '').split('-').reverse().join('/');
+                let labelLama = `${keg.jenis_kegiatan} (${tglLama})`;
+                let izinLama = await db.collection("Izin").where("kegiatan", "==", labelLama).where("status", "==", "Diterima").get();
+                izinLama.forEach(i => izinUsers.push(i.data().username));
+            }
 
             let targetDewanArray = keg.target_peserta || "ALL";
             let userListToPenalize = [];
@@ -337,11 +355,10 @@
         }
 
         for (let uid in pointUpdates) {
-            let poinBaru = usersData[uid].poin + pointUpdates[uid];
+            let poinBaru = (parseInt(usersData[uid].poin, 10) || 0) + pointUpdates[uid];
             batch.update(db.collection("Users").doc(uid), { poin: poinBaru });
         }
 
-        batch.set(cronRef, { last_run: todayStr }, { merge: true });
         await batch.commit();
         
         if(Object.keys(pointUpdates).length > 0) {
@@ -516,6 +533,13 @@
     function logout() {
       localStorage.clear();
       auth.signOut().then(() => { window.location.href = "index.html"; });
+    }
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (e) { console.log('Service worker gagal:', e.message); });
+      });
     }
   </script>
 </body>

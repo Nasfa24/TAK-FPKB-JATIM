@@ -11,7 +11,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="guard.js" data-roles="Bendahara,Koordinator"></script>
 
   <script>tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }</script>
 </head>
@@ -105,86 +107,103 @@
 
     async function cekTagihanDanValidasi(docId, username, namaUser, bulanTahun, fileUrl) {
       Swal.fire({ title: 'Menarik Nominal Tagihan...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
-      
+
       try {
         let response = await fetch(GAS_URL, {
           method: 'POST',
           body: JSON.stringify({ action: "getTransparansiKas", bulanTahun: bulanTahun })
         });
         let resData = await response.json();
-        
-        let tagihanUser = resData.data.find(u => u.username === username);
-        if(!tagihanUser) throw new Error("Data tagihan tidak ditemukan di GSheets untuk bulan tersebut.");
 
-        let nominalBayar = parseInt(tagihanUser.total);
+        let tagihanUser = (resData.data || []).find(u => u.username === username);
+        if (!tagihanUser) throw new Error("Data tagihan tidak ditemukan di GSheets untuk bulan tersebut.");
+
+        let nominalBayar = parseInt(tagihanUser.total, 10) || 0;
+        if (nominalBayar <= 0) throw new Error("Nominal tagihan nol. Periksa baris GSheet anggota ini.");
         let totalRp = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(nominalBayar);
 
-        Swal.fire({
+        let konfirmasi = await Swal.fire({
           title: `Verifikasi Setoran`,
           html: `<p class="text-sm text-gray-600 mb-2">Nama: <b>${namaUser}</b></p>
-                 <p class="text-sm text-gray-600 mb-4">Total Tagihan di GSheet: <b class="text-xl text-emerald-600">${totalRp}</b></p>
-                 <p class="text-xs text-gray-500">Aksi ini akan menandai Lunas, menambah Saldo Organisasi, dan mencatat di Buku Besar.</p>`,
+                 <p class="text-sm text-gray-600 mb-1">Total Tagihan di GSheet: <b class="text-xl text-emerald-600">${totalRp}</b></p>
+                 <p class="text-xs text-gray-500">Aksi ini akan menandai Lunas di GSheets, menambah saldo, dan mencatat buku besar.</p>`,
           icon: 'question', showCancelButton: true,
-          confirmButtonColor: '#059669', confirmButtonText: 'Tandai LUNAS & Rekap Otomatis', cancelButtonText: 'Batal'
-        }).then(async (result) => {
-          if (result.isConfirmed) {
-            Swal.fire({ title: 'Memproses 3 Aksi Otomatis...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
-            
-            // AKSI 1: Update GSheets Status Lunas
-            let gasRes = await fetch(GAS_URL, {
-              method: 'POST',
-              body: JSON.stringify({ action: "validasiKasLunas", username: username, bulanTahun: bulanTahun })
-            });
-            let gasData = await gasRes.json();
-            if (gasData.status !== "success") throw new Error(gasData.message);
-
-            // Menghilangkan status pending di layar
-            await db.collection("Setoran_Kas").doc(docId).update({ status: "Lunas (Terverifikasi)" });
-
-            // ========================================================
-            // AKSI 2 & 3: TEMBAK KE SALDO LIVE (FIREBASE) & BUKU BESAR
-            // ========================================================
-            let partsBln = bulanTahun.split("-"); // MM-YYYY
-            let namaBulanTxt = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"][parseInt(partsBln[0])-1] + " " + partsBln[1];
-            
-            let keteranganTx = `Pembayaran Kas ${namaBulanTxt} - ${namaUser}`;
-            let idTx = "TRX-" + new Date().getTime();
-            let tglSekarang = new Date().toLocaleDateString('en-CA');
-            let namaBendahara = localStorage.getItem('tak_nama') || "Sistem";
-
-            // Aksi 2: Saldo Live Firebase
-            await db.collection("Kas_Transaksi").doc(idTx).set({
-              id_transaksi: idTx,
-              tipe: "Masuk",
-              tanggal: tglSekarang,
-              nominal: nominalBayar,
-              keterangan: keteranganTx,
-              file_url: fileUrl,
-              diinput_oleh: namaBendahara + " (Auto)",
-              waktu_input: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            // Aksi 3: Buku Kas Besar GSheets
-            let payloadBuku = {
-              action: "catatBukuBesar",
-              idTx: idTx,
-              tanggal: tglSekarang,
-              tipe: "Masuk",
-              nominal: nominalBayar,
-              keterangan: keteranganTx,
-              diinput_oleh: namaBendahara + " (Auto)",
-              fileUrl: fileUrl
-            };
-            fetch(GAS_URL, { method: "POST", body: JSON.stringify(payloadBuku) }).catch(e => console.log(e));
-
-            Swal.fire('Sukses Terotomatisasi!', `${namaUser} LUNAS, Saldo Live Bertambah, dan Buku Besar telah dicatat.`, 'success');
-            loadSetoranPending(); 
-          }
+          confirmButtonColor: '#059669', confirmButtonText: 'Tandai LUNAS', cancelButtonText: 'Batal'
         });
+        if (!konfirmasi.isConfirmed) return;
+
+        Swal.fire({ title: 'Memproses...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+
+        let partsBln = bulanTahun.split("-");
+        let idxBulan = parseInt(partsBln[0], 10) - 1;
+        let namaBulanTxt = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"][idxBulan] + " " + partsBln[1];
+        let keteranganTx = `Pembayaran Kas ${namaBulanTxt} - ${namaUser}`;
+        let idTx = `TRX-KAS-${bulanTahun}-${username}`;
+        let tglSekarang = new Date().toLocaleDateString('en-CA');
+        let namaBendahara = localStorage.getItem('tak_nama') || "Sistem";
+
+        // 1. Kunci GSheets lebih dulu. Kalau gagal, tidak ada yang berubah.
+        let gasRes = await fetch(GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: "validasiKasLunas", username: username, bulanTahun: bulanTahun })
+        });
+        let gasData = await gasRes.json();
+        if (gasData.status !== "success") throw new Error(gasData.message || "GSheets menolak validasi.");
+
+        // 2. Firestore atomik. Id transaksi deterministik mencegah pencatatan ganda.
+        await db.runTransaction(async (tx) => {
+          let refSetoran = db.collection("Setoran_Kas").doc(docId);
+          let snapSetoran = await tx.get(refSetoran);
+          if (snapSetoran.exists && String(snapSetoran.data().status || "").indexOf("Lunas") >= 0) {
+            throw new Error("Setoran ini sudah pernah diverifikasi.");
+          }
+          tx.set(db.collection("Kas_Transaksi").doc(idTx), {
+            id_transaksi: idTx,
+            tipe: "Masuk",
+            tanggal: tglSekarang,
+            nominal: nominalBayar,
+            keterangan: keteranganTx,
+            file_url: fileUrl || "",
+            diinput_oleh: namaBendahara + " (Auto)",
+            waktu_input: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          tx.update(refSetoran, { status: "Lunas (Terverifikasi)", id_transaksi: idTx, waktu_verifikasi: firebase.firestore.FieldValue.serverTimestamp() });
+        });
+
+        // 3. Buku besar GSheets. Wajib ditunggu, jangan dilepas tanpa laporan.
+        let sinkronBuku = true;
+        try {
+          let resBuku = await fetch(GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+              action: "catatBukuBesar", idTx: idTx, tanggal: tglSekarang, tipe: "Masuk",
+              nominal: nominalBayar, keterangan: keteranganTx,
+              diinput_oleh: namaBendahara + " (Auto)", fileUrl: fileUrl || ""
+            })
+          });
+          let jsonBuku = await resBuku.json();
+          if (jsonBuku.status !== "success") sinkronBuku = false;
+        } catch (e) {
+          sinkronBuku = false;
+        }
+
+        if (sinkronBuku) {
+          Swal.fire('Selesai', `${namaUser} LUNAS. Saldo dan buku besar sudah tercatat.`, 'success');
+        } else {
+          Swal.fire('Kas tercatat, buku besar gagal', `Transaksi ${idTx} sudah masuk saldo tapi belum masuk buku besar GSheets. Catat manual dengan ID itu. Jangan ulangi verifikasi.`, 'warning');
+        }
+        loadSetoranPending();
 
       } catch (error) {
         Swal.fire('Gagal', error.message, 'error');
       }
+    }
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (e) { console.log('Service worker gagal:', e.message); });
+      });
     }
   </script>
 </body>

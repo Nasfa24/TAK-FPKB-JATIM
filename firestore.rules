@@ -1,0 +1,80 @@
+rules_version = '2';
+
+// Aturan Firestore Lebah Indrapura.
+// Prinsip: tidak ada akses tanpa login Firebase. Semua baca dan tulis wajib sesi sah
+// dengan email berdomain @tak.fpkb.id.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function masuk() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email.matches('.*@tak\\.fpkb\\.id$');
+    }
+
+    // Users: dibaca semua anggota, diubah hanya lewat halaman manajemen.
+    // Perubahan poin dibatasi supaya tidak bisa digelembungkan dari konsol.
+    match /Users/{uid} {
+      allow read: if masuk();
+      allow update: if masuk()
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasOnly(['poin'])
+          || (
+            request.resource.data.poin is number
+            && request.resource.data.poin <= resource.data.poin + 7
+            && request.resource.data.poin >= resource.data.poin - 30
+          )
+        );
+      allow create, delete: if false;
+    }
+
+    match /Absensi/{d} {
+      allow read: if masuk();
+      allow create: if masuk();
+      allow update, delete: if false;
+    }
+
+    match /Izin/{d} {
+      allow read: if masuk();
+      allow create: if masuk();
+      allow update: if masuk();
+      allow delete: if false;
+    }
+
+    match /Setoran_Kas/{d} {
+      allow read: if masuk();
+      allow create: if masuk();
+      allow update: if masuk();
+      allow delete: if false;
+    }
+
+    match /Kas_Transaksi/{d} {
+      allow read: if masuk();
+      allow create: if masuk();
+      allow update, delete: if false;
+    }
+
+    match /Laporan_Kinerja/{d} {
+      allow read: if masuk();
+      allow create: if masuk();
+      allow update: if masuk();
+      allow delete: if false;
+    }
+
+    match /Jadwal_Kegiatan/{d} {
+      allow read: if masuk();
+      allow create, update: if masuk();
+      allow delete: if false;
+    }
+
+    match /Log_Penalti/{d} {
+      allow read: if masuk();
+      allow create: if masuk();
+      allow update, delete: if false;
+    }
+
+    match /Sistem/{d} {
+      allow read, write: if masuk();
+    }
+  }
+}

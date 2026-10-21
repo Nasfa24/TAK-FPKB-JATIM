@@ -12,7 +12,9 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="guard.js" data-roles="TAK,Koordinator,Bendahara"></script>
 
   <script>
     tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }
@@ -136,7 +138,7 @@
           let tanggalStr = data.tanggal.split("-").reverse().join("/"); // DD/MM/YYYY
           // Boleh ajukan izin selama kegiatan belum ditutup
           if(data.status !== "Ditutup") {
-            selectKegiatan.innerHTML += `<option value="${data.jenis_kegiatan} (${tanggalStr})">${data.jenis_kegiatan} - ${tanggalStr}</option>`;
+            selectKegiatan.innerHTML += `<option value="${doc.id}" data-jenis="${data.jenis_kegiatan}">${data.jenis_kegiatan} - ${tanggalStr}</option>`;
           }
         });
       } catch (error) {
@@ -196,12 +198,15 @@
     async function kirimIzin(e) {
       e.preventDefault();
       
-      const kegiatan = document.getElementById('inputKegiatan').value;
+      const selKegiatan = document.getElementById('inputKegiatan');
+      const idKegiatan = selKegiatan.value;
+      const jenisKegiatan = (selKegiatan.selectedOptions[0] && selKegiatan.selectedOptions[0].dataset.jenis) ? selKegiatan.selectedOptions[0].dataset.jenis : "";
+      const kegiatan = jenisKegiatan;
       const alasan = document.getElementById('inputAlasan').value;
       const fileInput = document.getElementById('fileBukti').files[0];
       const btn = document.getElementById('btnSubmit');
 
-      if (!kegiatan) { Swal.fire('Oops', 'Pilih kegiatan yang ingin dimintakan izin.', 'warning'); return; }
+      if (!idKegiatan) { Swal.fire('Oops', 'Pilih kegiatan yang ingin dimintakan izin.', 'warning'); return; }
       if (!fileInput) { Swal.fire('Oops', 'Wajib melampirkan foto bukti!', 'warning'); return; }
       if (fileInput.size > 5 * 1024 * 1024) { Swal.fire('File Terlalu Besar', 'Maksimal ukuran file bukti adalah 5MB.', 'error'); return; }
 
@@ -235,8 +240,20 @@
         let linkBerkas = gasResult.fileUrl || "Lihat Langsung di Folder Izin GDrive";
 
         // Catat di Firebase untuk Antrean Validasi Koordinator
+        // Tolak pengajuan ganda untuk kegiatan yang sama
+        let izinLama = await db.collection("Izin")
+          .where("username", "==", currentUser)
+          .where("id_kegiatan", "==", idKegiatan)
+          .get();
+        let sudahAda = izinLama.docs.some(d => (d.data().status || "") !== "Ditolak");
+        if (sudahAda) {
+          throw new Error("Anda sudah mengajukan izin untuk kegiatan ini. Tunggu keputusan koordinator.");
+        }
+
         let idIzin = "IZIN-" + new Date().getTime();
         await db.collection("Izin").doc(idIzin).set({
+          id_kegiatan: idKegiatan,
+          jenis_kegiatan: jenisKegiatan,
           id_izin: idIzin,
           username: currentUser,
           nama: currentNama,
@@ -264,6 +281,13 @@
         btn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg> Ajukan Izin Sekarang`;
         btn.disabled = false;
       }
+    }
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (e) { console.log('Service worker gagal:', e.message); });
+      });
     }
   </script>
 </body>

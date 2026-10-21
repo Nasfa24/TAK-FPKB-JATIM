@@ -12,7 +12,9 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="guard.js" data-roles="Koordinator"></script>
 
   <script>
     tailwind.config = { theme: { extend: { colors: { pkb: { light: '#34d399', DEFAULT: '#059669', dark: '#047857' } } } } }
@@ -208,6 +210,13 @@
         icon: 'info', title: 'Prosedur Keamanan',
         html: `Untuk me-reset kata sandi akun <b>${userSedangDiedit}</b>, Admin Pusat harus melakukannya melalui <b>Firebase Console > Authentication</b> demi keamanan enkripsi.<br><br><span class="text-red-500 font-bold">Silahkan hubungi Koordinator.</span>`,
         confirmButtonColor: '#059669', confirmButtonText: 'Mengerti'
+      });
+    }
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (e) { console.log('Service worker gagal:', e.message); });
       });
     }
   </script>

@@ -12,7 +12,9 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="guard.js" data-roles="Koordinator"></script>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
   <script>
@@ -134,9 +136,18 @@
         let idKegiatan = kegiatanTerpilih.id_kegiatan;
         let usernameTak = decodedText.trim();
 
+        let statusKeg = String(kegiatanTerpilih.status || "Aktif").toLowerCase();
+        if (statusKeg !== "aktif") throw new Error(`Kegiatan berstatus ${kegiatanTerpilih.status}. Absensi tidak dibuka.`);
+
         let userDoc = await db.collection("Users").doc(usernameTak).get();
         if (!userDoc.exists) throw new Error("QR Code tidak valid. Bukan anggota TAK.");
-        let namaTak = userDoc.data().nama;
+        let dataTak = userDoc.data();
+        if (String(dataTak.role || "").toLowerCase() !== "tak") throw new Error("QR ini bukan milik anggota TAK.");
+        let targetKeg = kegiatanTerpilih.target_peserta || "ALL";
+        if (targetKeg !== "ALL" && Array.isArray(targetKeg) && !targetKeg.includes(String(dataTak.dewan || ""))) {
+          throw new Error("Anggota ini bukan peserta kegiatan tersebut.");
+        }
+        let namaTak = dataTak.nama || usernameTak;
 
         let jamStr = kegiatanTerpilih.jam_mulai;
         if(jamStr.length <= 5) jamStr += ":00";
@@ -165,16 +176,17 @@
         }
         let poinNet = poinDasar - dendaPoin;
 
-        let batch = db.batch();
-        batch.set(db.collection("Absensi").doc(), {
-          id_absensi: "ABS-" + now.getTime(), id_kegiatan: idKegiatan, jenis_kegiatan: kegiatanTerpilih.jenis_kegiatan,
-          username: usernameTak, waktu_scan: firebase.firestore.FieldValue.serverTimestamp(), status: statusHadir, poin_didapat: poinNet
+        let refAbsen = db.collection("Absensi").doc();
+        let refUser = db.collection("Users").doc(usernameTak);
+        await db.runTransaction(async (tx) => {
+          let snapUser = await tx.get(refUser);
+          let poinLama = (snapUser.exists && snapUser.data().poin) ? (parseInt(snapUser.data().poin, 10) || 0) : 0;
+          tx.set(refAbsen, {
+            id_absensi: "ABS-" + now.getTime(), id_kegiatan: idKegiatan, jenis_kegiatan: kegiatanTerpilih.jenis_kegiatan,
+            username: usernameTak, waktu_scan: firebase.firestore.FieldValue.serverTimestamp(), status: statusHadir, poin_didapat: poinNet
+          });
+          tx.update(refUser, { poin: poinLama + poinNet });
         });
-
-        let poinLama = userDoc.data().poin ? parseInt(userDoc.data().poin) : 0;
-        batch.update(db.collection("Users").doc(usernameTak), { poin: poinLama + poinNet });
-
-        await batch.commit();
 
         Swal.fire({ 
           icon: 'success', title: 'Berhasil!', 
@@ -186,6 +198,13 @@
         Swal.fire({ icon: 'error', title: 'Ditolak', text: error.message, confirmButtonColor: '#d33' })
         .then(() => { html5QrCode.resume(); });
       }
+    }
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (e) { console.log('Service worker gagal:', e.message); });
+      });
     }
   </script>
 </body>
