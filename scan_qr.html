@@ -87,7 +87,7 @@
     // KETIKA KAMERA BERHASIL MEMBACA QR
     async function onScanSuccess(decodedText) {
       if(html5QrCode) {
-        html5QrCode.stop().then(() => html5QrCode.clear()).catch(e => console.log(e)); // Matikan total
+        try { Promise.resolve(html5QrCode.stop()).then(function(){ try{ html5QrCode.clear(); }catch(e){} }).catch(function(){}); } catch(e) { console.log('Kamera sudah berhenti:', e.message); }
       }
       
       Swal.fire({ title: 'Memeriksa Jadwal...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
@@ -177,7 +177,7 @@
     }
 
     function kembali() {
-      if(html5QrCode) { html5QrCode.stop().catch(e => console.log(e)); }
+      try { Promise.resolve(html5QrCode.stop()).catch(function(){}); } catch(e) { console.log('Kamera sudah berhenti:', e.message); }
       let role = localStorage.getItem('tak_role') || "";
       let dest = role.toLowerCase().includes('koordinator') ? 'dashboard_koordinator.html' : 'dashboard_tak.html';
       window.location.href = dest;

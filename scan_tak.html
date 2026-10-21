@@ -121,7 +121,7 @@
 
     function stopScanner() {
       if(html5QrCode) { 
-        html5QrCode.stop().then(() => { html5QrCode.clear(); }).catch(err => console.log(err));
+        try { Promise.resolve(html5QrCode.stop()).then(function(){ try{ html5QrCode.clear(); }catch(e){} }).catch(function(){}); } catch(e) { console.log('Kamera sudah berhenti:', e.message); }
       }
       document.getElementById('boxKamera').classList.add('hidden');
       document.getElementById('boxKamera').classList.remove('flex');
