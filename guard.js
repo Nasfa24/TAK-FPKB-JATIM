@@ -4,6 +4,31 @@
   var skrip = document.currentScript;
   var daftarPeran = ((skrip && skrip.dataset && skrip.dataset.roles) || "TAK,Koordinator,Bendahara").split(",");
 
+
+  // Setiap panggilan ke Apps Script disisipi token Firebase.
+  // Backend boleh mengabaikannya sampai pemeriksaan token dipasang.
+  var fetchAsli = window.fetch;
+  window.fetch = function (url, opsi) {
+    var target = (typeof url === 'string') ? url : (url && url.url) || '';
+    if (target.indexOf('script.google.com/macros/s/') === -1) {
+      return fetchAsli.apply(this, arguments);
+    }
+    var user = firebase.auth().currentUser;
+    if (!user) { return fetchAsli.apply(this, arguments); }
+    return user.getIdToken().then(function (token) {
+      var opts = opsi ? Object.assign({}, opsi) : {};
+      var body = opts.body;
+      if (typeof body === 'string') {
+        try {
+          var obj = JSON.parse(body);
+          obj.token = token;
+          opts.body = JSON.stringify(obj);
+        } catch (e) { /* body bukan JSON, biarkan */ }
+      }
+      return fetchAsli.call(window, url, opts);
+    });
+  };
+
   function tolak(pesan) {
     localStorage.removeItem('tak_username');
     localStorage.removeItem('tak_role');
