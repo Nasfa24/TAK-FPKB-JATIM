@@ -95,6 +95,25 @@ function tolak(pesan) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+
+// Mendeteksi pemisah argumen rumus yang sah di spreadsheet ini.
+function pemisahRumus(sheet) {
+  const uji = sheet.getRange(1, 26); // kolom Z
+  const lama = uji.getFormula();
+  try {
+    uji.setFormula("=IF(TRUE,1,2)");
+    SpreadsheetApp.flush();
+    if (String(uji.getValue()).indexOf("#ERROR") === 0) {
+      uji.setFormula("=IF(TRUE;1;2)");
+      SpreadsheetApp.flush();
+      return String(uji.getValue()) === "1" ? ";" : ",";
+    }
+    return ",";
+  } finally {
+    uji.setFormula(lama || "");
+  }
+}
+
 function balas(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
@@ -270,21 +289,66 @@ function doPost(e) {
         unik.push(u);
       }
 
-      let addedCount = 0;
       if (unik.length > 0) {
         let mulai = sheetKas.getLastRow() + 1;
         let baris = [];
         for (let j = 0; j < unik.length; j++) {
-          let r = mulai + j;
-          let formulaDenda = "=IF(ISBLANK(B" + r + "), 0, IF(VLOOKUP(B" + r + ", Users!A:G, 6, FALSE) < 100, (100 - VLOOKUP(B" + r + ", Users!A:G, 6, FALSE)) * 500, 0))";
-          let formulaTotal = "=IF(ISBLANK(C" + r + "), 0, C" + r + " + D" + r + ")";
-          baris.push([targetBulan, unik[j], nominalDasar, formulaDenda, formulaTotal, "Belum Lunas"]);
+          baris.push([targetBulan, unik[j], nominalDasar, "", "", "Belum Lunas"]);
         }
         sheetKas.getRange(mulai, 1, baris.length, 6).setValues(baris);
-        addedCount = baris.length;
       }
 
-      return balas({ status: "success", message: "Berhasil! " + addedCount + " Tagihan baru untuk bulan " + targetBulan + " telah dibuat otomatis di GSheets." });
+      // Tulis ulang rumus denda untuk SEMUA baris bulan ini, termasuk yang lama.
+      // Pemisah argumen mengikuti lokal spreadsheet (Indonesia memakai titik koma).
+      let pemisah = pemisahRumus(sheetKas);
+      let isiKas = sheetKas.getDataRange().getValues();
+      let rumusDenda = [];
+      for (let i = 1; i < isiKas.length; i++) {
+        let bln = isiKas[i][0] instanceof Date
+          ? Utilities.formatDate(isiKas[i][0], "GMT+7", "MM-yyyy")
+          : String(isiKas[i][0]).trim();
+        if (bln !== targetBulan) { continue; }
+        let r = i + 1;
+        let f1 = "=IF(ISBLANK(B" + r + ")" + pemisah + " 0" + pemisah +
+          " IF(VLOOKUP(B" + r + pemisah + " Users!A:G" + pemisah + " 6" + pemisah + " FALSE) < 100" + pemisah +
+          " (100 - VLOOKUP(B" + r + pemisah + " Users!A:G" + pemisah + " 6" + pemisah + " FALSE)) * 500" + pemisah + " 0))";
+        let f2 = "=IF(ISBLANK(C" + r + ")" + pemisah + " 0" + pemisah + " C" + r + " + D" + r + ")";
+        rumusDenda.push([f1, f2]);
+        if (rumusDenda.length === 100) { break; }
+      }
+      if (rumusDenda.length > 0) {
+        let barisAwal = 0;
+        for (let i = 1; i < isiKas.length; i++) {
+          let bln = isiKas[i][0] instanceof Date
+            ? Utilities.formatDate(isiKas[i][0], "GMT+7", "MM-yyyy")
+            : String(isiKas[i][0]).trim();
+          if (bln === targetBulan) { barisAwal = i + 1; break; }
+        }
+        sheetKas.getRange(barisAwal, 4, rumusDenda.length, 2).setFormulas(rumusDenda);
+        SpreadsheetApp.flush();
+        if (String(sheetKas.getRange(barisAwal, 4).getValue()).indexOf("#") === 0) {
+          // Jaring pengaman: bila rumus tidak diterima sheet, tulis angka langsung.
+          let poinMap = {};
+          for (let i = 1; i < dataUsers.length; i++) {
+            let u = dataUsers[i][0].toString().trim();
+            if (!u || poinMap[u] !== undefined) { continue; }
+            poinMap[u] = parseInt(dataUsers[i][5], 10) || 0;
+          }
+          let angka = [];
+          for (let i = 0; i < rumusDenda.length; i++) {
+            let r = barisAwal + i;
+            let nama = String(sheetKas.getRange(r, 2).getValue()).trim();
+            let p = poinMap[nama] !== undefined ? poinMap[nama] : 100;
+            let denda = p < 100 ? (100 - p) * 500 : 0;
+            let nominal = parseInt(sheetKas.getRange(r, 3).getValue(), 10) || 0;
+            angka.push([denda, nominal + denda]);
+          }
+          sheetKas.getRange(barisAwal, 4, angka.length, 2).setValues(angka);
+        }
+      }
+
+      return balas({ status: "success", message: "Berhasil! " + unik.length + " tagihan baru untuk " + targetBulan + ", " + rumusDenda.length + " baris rumus denda diperbarui." });
+
     }
 
     if (payload.action === "uploadBuktiTransaksi") {
