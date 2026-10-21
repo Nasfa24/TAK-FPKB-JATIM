@@ -22,7 +22,7 @@ service cloud.firestore {
           || (
             request.resource.data.poin is number
             && request.resource.data.poin <= resource.data.poin + 7
-            && request.resource.data.poin >= resource.data.poin - 30
+            && request.resource.data.poin >= resource.data.poin - 200
           )
         );
       allow create, delete: if false;
